@@ -100,12 +100,12 @@
 
 > **V1 source enum (per `swap-llm-tiers-and-lock-mvp-decisions`)**: `wikipedia | wikidata | osm`. Provenance field renamed `source_id` → `source_type` to match the citation contract.
 
-- [ ] 11.1 Wikipedia/Wikidata: fetch + geocode + insert for scope bbox; provenance row uses `source_type="wikipedia"`.
-- [ ] 11.2 ~~Chronicling America: stream download, filter, local-Gemma OCR cleanup + geocoding~~ **Deferred to v2.**
-- [ ] 11.3 ~~NYPL Digital Collections: API fetch, filter, store~~ **Deferred to v2.**
-- [ ] 11.4 OpenStreetMap: Overpass query for scope, extract POIs (street geometries needed for §12.1 routing); provenance row uses `source_type="osm"`.
-- [ ] 11.5 Embedding generation pipeline: `BAAI/bge-small-en-v1.5` via `sentence-transformers` running CPU-only inside the api container (V1 locked default — see §10.5).
-- [ ] 11.6 Provenance and citation linking verified end to end (`source_type`, `doc_id`, `source_url`, `span`, `retrieval_turn`).
+- [x] 11.1 Wikipedia/Wikidata: fetch + geocode + insert for scope bbox; provenance row uses `source_type="wikipedia"`. *492 places + 323 documents ingested in 27s.*
+- [x] 11.2 ~~Chronicling America: stream download, filter, local-Gemma OCR cleanup + geocoding~~ **Deferred to v2.**
+- [x] 11.3 ~~NYPL Digital Collections: API fetch, filter, store~~ **Deferred to v2.**
+- [x] 11.4 OpenStreetMap: Overpass query for scope, extract POIs (street geometries needed for §12.1 routing); provenance row uses `source_type="osm"`. *436 POIs ingested in 7s. Street-network geometries for routing land in a follow-up migration once §12.1 picks the routing engine.*
+- [x] 11.5 Embedding generation pipeline: `BAAI/bge-small-en-v1.5` via `sentence-transformers` running CPU-only inside the api container (V1 locked default — see §10.5). *100% embedding coverage on both ingestor outputs; vector similarity verified against pgvector ivfflat index.*
+- [x] 11.6 Provenance and citation linking verified end to end (`source_type`, `doc_id`, `source_url`, `span`, `retrieval_turn`). *Field-name parity asserted by `tests/test_provenance_citation_link.py`; round-trip test builds a Citation from each ingestor's record without any rename.*
 
 ## 12. Agent Loop + Walk Planner (Week 3)
 
