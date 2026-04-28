@@ -76,15 +76,15 @@
 
 > **V1 cuts (per `swap-llm-tiers-and-lock-mvp-decisions`)**: tool surface reduced to a single LLM-callable tool (`search_places`); `plan_walk` becomes server-side post-processing, not a tool; `/agent/ask` streams over Server-Sent Events instead of WebSocket.
 
-- [ ] 9.1 Create `apps/api/app/agent/__init__.py` *(keeps tool base + JSON Schema infrastructure even though only one V1 tool is registered — the protocol is reused by §12.1 server-side `plan_walk` post-processing)*
-- [ ] 9.2 Create `apps/api/app/agent/tools/base.py` with `Tool` base class and JSON schema helpers
-- [ ] 9.3 Create `apps/api/app/agent/tools/search_places.py` stub returning empty results — **only V1 LLM-callable tool**
-- [ ] 9.4 ~~Create `apps/api/app/agent/tools/spatial_query.py` stub~~ **Deferred to v2.**
-- [ ] 9.5 ~~Create `apps/api/app/agent/tools/historical_lookup.py` stub~~ **Deferred to v2.**
-- [ ] 9.6 ~~Create `apps/api/app/agent/tools/current_events.py` stub~~ **Deferred to v2.**
-- [ ] 9.7 Implement `plan_walk` as **server-side post-processing** (PostGIS routing pass after the agent emits its final `citations[]`), NOT as an LLM-callable tool. Lives at `apps/api/app/agent/walk.py` (or `app/walk/`), invoked by the SSE handler before terminal narration is sent.
-- [ ] 9.8 Create `apps/api/app/agent/loop.py` with the tool-calling loop. **V1**: register only `search_places` in the LLM `tools` parameter; turn cap remains 6 to allow multi-turn refinement (broad query → narrowed query).
-- [ ] 9.9 Create `apps/api/app/routes/agent.py` exposing `/agent/ask` as a **Server-Sent Events** endpoint (`StreamingResponse(media_type="text/event-stream")`). Update `apps/web/nginx.conf` with `proxy_buffering off; proxy_read_timeout 86400s;` for the `/api/agent/ask` location.
+- [x] 9.1 Create `apps/api/app/agent/__init__.py` *(keeps tool base + JSON Schema infrastructure even though only one V1 tool is registered — the protocol is reused by §12.1 server-side `plan_walk` post-processing)*
+- [x] 9.2 Create `apps/api/app/agent/tools/base.py` with `Tool` base class and JSON schema helpers (jsonschema-validated args, `ToolRegistry`, `UnknownToolError`)
+- [x] 9.3 Create `apps/api/app/agent/tools/search_places.py` — **only V1 LLM-callable tool**. Hybrid retrieval: cosine ANN over `places.embedding` + optional `ST_DWithin` filter. Returns hits carrying `doc_id`, `source_url`, `source_type` ready for verbatim citation copy.
+- [x] 9.4 ~~Create `apps/api/app/agent/tools/spatial_query.py` stub~~ **Deferred to v2.**
+- [x] 9.5 ~~Create `apps/api/app/agent/tools/historical_lookup.py` stub~~ **Deferred to v2.**
+- [x] 9.6 ~~Create `apps/api/app/agent/tools/current_events.py` stub~~ **Deferred to v2.**
+- [x] 9.7 `plan_walk` as **server-side post-processing** at `apps/api/app/agent/walk.py`. PostGIS lookup of cited place_ids, narration-order route preservation per V1 spec, haversine leg distances. Invoked by the SSE handler before the terminal frame.
+- [x] 9.8 Agent loop at `apps/api/app/agent/loop.py`. Single tool registered (`search_places`), turn cap 6 with one verification retry beyond. Final-turn fallback strips tools and forces `response_format=json` + 8192 max_tokens to give the thinking model room to emit JSON.
+- [x] 9.9 SSE endpoint at `apps/api/app/routes/agent.py`. Streams `turn`, `tool_call`, `tool_result`, `narration`, `citations`, `walk`, `done` events as `text/event-stream`. nginx.conf updated with `proxy_buffering off`, `proxy_read_timeout 86400s`, and `chunked_transfer_encoding off` for the `/api/agent/ask` location.
 
 ## 10. Database Schema (stubs)
 

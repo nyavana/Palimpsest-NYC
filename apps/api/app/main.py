@@ -14,6 +14,9 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app import __version__
+from app.agent.loop import AgentLoop
+from app.agent.tools.base import ToolRegistry
+from app.agent.tools.search_places import SearchPlacesTool
 from app.config import Settings, get_settings
 from app.db.engine import build_engine, build_session_factory
 from app.embeddings import build_embedder
@@ -21,7 +24,7 @@ from app.llm.cache import CacheTtl, LLMCache
 from app.llm.router import build_llm_router
 from app.llm.telemetry import TelemetrySink
 from app.logging import configure_logging, get_logger
-from app.routes import health, llm, meta
+from app.routes import agent, health, llm, meta
 
 log = get_logger(__name__)
 
@@ -88,6 +91,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.embedder = build_embedder(settings.embeddings)
     log.info("embedder.ready", dim=app.state.embedder.dim)
 
+    # Agent surface — V1 contract: exactly one tool registered (search_places)
+    tool_registry = ToolRegistry()
+    tool_registry.register(SearchPlacesTool())
+    app.state.agent_tool_registry = tool_registry
+    app.state.agent_loop_builder = lambda _request: AgentLoop(
+        router=app.state.llm_router,
+        registry=tool_registry,
+    )
+
     # Meta-instrumentation harness (populated in task 9)
     from app.meta.session_log import SessionLogger
 
@@ -127,6 +139,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(llm.router, prefix="/llm", tags=["llm"])
     app.include_router(meta.router, prefix="/internal", tags=["meta"])
+    app.include_router(agent.router)
 
     # ── Exception handlers ────────────────────────────────────
     @app.exception_handler(Exception)
