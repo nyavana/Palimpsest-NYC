@@ -109,10 +109,10 @@
 
 ## 12. Agent Loop + Walk Planner (Week 3)
 
-- [ ] 12.1 Implement `plan_walk` as a **server-side post-processing step** (not an LLM tool): after the agent emits its terminal narration with `citations[]` referencing N `place_ids`, run a deterministic PostGIS routing pass to produce an ordered walking route. Returned as part of the `/agent/ask` SSE stream's terminal frame.
-- [ ] 12.2 Implement narration generator with mandatory citation JSON contract — narration is the agent's terminal response; no separate "narrate" tool. Five required Citation fields: `doc_id`, `source_url`, `source_type`, `span`, `retrieval_turn`.
-- [ ] 12.3 Implement citation verifier pass — verifies `doc_id`, `source_type`, `retrieval_turn`; **`span` is opaque to the verifier** (per locked contract).
-- [ ] 12.4 Wire **Server-Sent Events** streaming of narration chunks to the frontend (replaces WebSocket per `swap-llm-tiers-and-lock-mvp-decisions`). Frontend uses native `EventSource`.
+- [x] 12.1 Implement `plan_walk` as a **server-side post-processing step** (not an LLM tool): after the agent emits its terminal narration with `citations[]` referencing N `place_ids`, run a deterministic PostGIS routing pass to produce an ordered walking route. Returned as part of the `/agent/ask` SSE stream's terminal frame. *Lives at `apps/api/app/agent/walk.py`; emitted as the `event: walk` frame just before terminal `done`.*
+- [x] 12.2 Implement narration generator with mandatory citation JSON contract — narration is the agent's terminal response; no separate "narrate" tool. Five required Citation fields: `doc_id`, `source_url`, `source_type`, `span`, `retrieval_turn`. *Lives at `apps/api/app/agent/loop.py`; system prompt enforces the JSON shape, verifier enforces the contract.*
+- [x] 12.3 Implement citation verifier pass — verifies `doc_id`, `source_type`, `retrieval_turn`; **`span` is opaque to the verifier** (per locked contract). *Lives at `apps/api/app/agent/citations.py`; 14 verifier scenarios covered by `tests/test_agent_citations.py`.*
+- [x] 12.4 Wire **Server-Sent Events** streaming of narration chunks to the frontend (replaces WebSocket per `swap-llm-tiers-and-lock-mvp-decisions`). Frontend uses native `EventSource`. *Lives at `apps/api/app/routes/agent.py`; nginx.conf has the `proxy_buffering off` block.*
 - [ ] 12.5 Frontend: render walk as a path + stop markers + fly-to animation per stop, using the ordered route from §12.1.
 
 ## 13. Live Data + Evaluation + Paper (Week 4)

@@ -4,7 +4,7 @@
 
 A graduate final project for **Columbia EECS E6895: Advanced Big Data and AI**.
 
-Palimpsest plans a short walking tour for a bounded slice of NYC and narrates it from free historical and live data sources — Wikipedia/Wikidata, Chronicling America, NYPL Digital Collections, OpenStreetMap, NYC Open Data, MTA GTFS-RT, and NOAA. Every claim in the narration is cited back to a retrieved source document.
+Palimpsest plans a short walking tour for a bounded slice of NYC and narrates it from free, public-domain data sources — Wikipedia/Wikidata + OpenStreetMap in V1, with Chronicling America, NYPL, NYC Open Data, MTA, NOAA tracked as v2 expansions. Every claim in the narration is cited back to a retrieved source document via a strict five-field citation contract verified at generation time.
 
 The entire codebase is being built end-to-end by Claude Code under a single human reviewer. Full session telemetry is captured to `logs/claude-sessions/*.jsonl` so the final report can quantify the cost, cycle time, and failure modes of agentic software engineering.
 
@@ -71,6 +71,27 @@ make down
 
 ---
 
+## Try the agent (backend SSE demo)
+
+Once `make up` brings the stack up, populate the corpus once and ask the agent
+a walking-tour question.
+
+```bash
+# 1. Populate the 5km² Morningside Heights + UWS corpus (~30s total)
+docker compose exec api python -m app.ingest.cli osm run
+docker compose exec api python -m app.ingest.cli wikipedia run
+
+# 2. Ask the agent a question; watch SSE events stream live
+curl -N "http://localhost:8000/agent/ask?q=Tell+me+about+a+gothic+cathedral+in+Morningside+Heights"
+```
+
+You should see a sequence of `event: turn`, `event: tool_call`,
+`event: tool_result` frames as the agent iterates `search_places`,
+followed by `event: narration`, `event: citations`, `event: walk`
+(ordered route with leg distances), and a terminal `event: done`.
+
+---
+
 ## Local Python dev (outside Docker)
 
 Every Python subproject uses an isolated virtual environment. No system Python installs.
@@ -105,9 +126,32 @@ openspec status --change initial-palimpsest-scaffold
 
 ## Status
 
-**Week 1** — scaffolding foundation: monorepo, docker-compose, FastAPI skeleton, LLM router, MapEngine abstraction, meta-instrumentation harness.
+**Backend MVP complete and demo-ready** (as of 2026-04-28).
 
-See `openspec/changes/initial-palimpsest-scaffold/tasks.md` for the full plan.
+| Phase | Spec | What | Status |
+|---|---|---|---|
+| §1-§8 | scaffold | Monorepo, docker-compose, FastAPI skeleton, LLM router, map engine, meta harness | ✓ shipped |
+| §10 | DB schema + embeddings | postgis + pgvector + pg_trgm; `places` + `documents` tables with `vector(384)`; `BAAI/bge-small-en-v1.5` singleton on app.state | ✓ shipped |
+| §11 | Ingestion | Wikipedia/Wikidata (492 places + 323 docs) + OSM Overpass (436 places); 100% embedding coverage | ✓ shipped |
+| §9 / §12.1-§12.4 | Agent + walk planner + SSE | Single-tool agent (`search_places`); locked five-field citation verifier; server-side `plan_walk`; `/agent/ask` SSE endpoint | ✓ shipped |
+| §12.5 | Frontend rendering | React `EventSource` consumer with map markers + flyTo | ⏳ next |
+| §13.4 / §13.6 | Eval + cost analysis | 5 hand-graded walks; ~10-walk free-vs-paid model comparison | ⏳ next |
+| §13.7 / §13.8 | Final report + 30s demo video | | ⏳ next |
+| §13.1-§13.3 / §14 | Live-data sources + VPS deploy | | deferred to v2 |
+
+**Numbers as of milestone 1**: 928 places + 323 documents in postgres,
+all with 384-dim embeddings. 120 unit tests pass. End-to-end agent run
+(question → narration → 3 verified citations → ordered walk) validated
+live with `kimi-k2.6` via OpenRouter.
+
+Per-phase deep-dives in [`docs/`](./docs):
+
+- [`docs/swap-llm-tiers-2026-04-28.md`](./docs/swap-llm-tiers-2026-04-28.md) — V1 MVP lock-down (LLM router rename, embedding model, citation contract, license)
+- [`docs/db-and-embeddings-2026-04-28.md`](./docs/db-and-embeddings-2026-04-28.md) — §10 schema + ORM + embedder
+- [`docs/ingestion-2026-04-28.md`](./docs/ingestion-2026-04-28.md) — §11 Wikipedia + OSM ingestion
+- [`docs/agent-2026-04-28.md`](./docs/agent-2026-04-28.md) — §9 / §12.1-4 agent + SSE
+
+Full task ledger: `openspec/changes/initial-palimpsest-scaffold/tasks.md`.
 
 ---
 
