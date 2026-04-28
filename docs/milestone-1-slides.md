@@ -1,26 +1,72 @@
-# Milestone 1 — Palimpsest NYC slide deck
+# Milestone 1 — Palimpsest NYC slide deck (Claude prompt)
 
-> Paste this whole markdown file into Google Gemini's canvas feature and ask it
-> to build a slide deck. The blocks below are slide-by-slide. Section headers
-> = slide titles, bullets = on-slide content, *italicized* lines = speaker
-> notes / what to say (do not put on the slide), and `[design hints]` give
-> Gemini guidance on visuals.
+> **How to use this file**: open a fresh Claude conversation and paste the
+> entire markdown below the next horizontal rule. Claude will produce a
+> single-file HTML artifact with all 8 slides ready to present. The
+> deliverable spec, design system, and slide content are all in-line.
 >
-> Total budget: **5 minutes = ~8 slides ≈ 35-40 s each**.
+> **Total budget**: 5 minutes ≈ 8 slides ≈ 35–40 s each.
 
 ---
 
-## Designer brief (read this once before building any slide)
+## Prompt for Claude (paste from here down)
 
-- **Tone**: graduate seminar, Columbia EECS E6895. Calm, technical, slightly literary. Avoid emoji; avoid "AI buzzwords". The project name *Palimpsest* is from medieval parchments scraped and re-written — lean into the archival/cartographic feel.
-- **Palette**: parchment cream `#F5EFE0` background, deep navy `#0F2A44` accent, brick red `#A23E2A` for highlights, charcoal `#2A2A2A` for body text.
-- **Typography**: serif for titles (Playfair Display / Cormorant Garamond / Lora). Sans-serif for body (Inter / Source Sans Pro). Monospace for code (JetBrains Mono / IBM Plex Mono).
-- **Layout**: generous whitespace. One core idea per slide. No more than 5 lines of text. Numbers should be large and prominent. Use the architecture diagram as a recurring visual motif (small inset on later slides).
-- **Imagery**: subtle Manhattan / topographic map texture in the background of title and section-divider slides at ~10% opacity. NO clip-art, NO stock photography of "people pointing at laptops". Hand-drawn map iconography only.
+You are designing a 5-minute milestone-1 presentation deck for *Palimpsest NYC*, a graduate final project for Columbia EECS E6895 (Advanced Big Data and AI). I want you to build this as **a single self-contained `index.html` artifact** I can open locally or screen-share. Read the full brief and slide content below, then produce the artifact.
+
+### Deliverable spec
+
+- **Artifact format**: one HTML file. Inline `<style>` + minimal vanilla JS for navigation. No external bundlers.
+- **Tailwind**: CDN script tag is fine (`https://cdn.tailwindcss.com`).
+- **Fonts**: load from Google Fonts — `Cormorant Garamond` (700) for slide titles, `Inter` (400/500/600) for body, `JetBrains Mono` (400/500) for code blocks.
+- **Aspect ratio**: 16:9. Each slide is a `min-h-screen` flex container that fills the viewport at 16:9, centered.
+- **Navigation**:
+  - Right-arrow / `Space` / `PageDown` / click → next slide.
+  - Left-arrow / `PageUp` → previous slide.
+  - `Home` → first slide. `End` → last slide.
+  - Touch / swipe support is nice-to-have, not required.
+  - Slide counter in the bottom-right (e.g. `3 / 8`) in muted gray.
+  - Subtle progress bar across the bottom (1px, brick-red fill).
+- **Print-friendly**: `@media print` rules so each slide becomes its own page when printed to PDF.
+- **No animation framework**. Use plain CSS transitions only — opacity fade between slides at most. No bouncing, no parallax, no carousel libs.
+- **Speaker notes**: hide on screen by default. A toggle button (or `n` keypress) reveals them as a floating panel at the bottom of the current slide. Notes never appear in the print/PDF output.
+
+### Design system (be strict about this)
+
+- **Tone**: graduate seminar, calm, technical, slightly literary. *Palimpsest* refers to medieval parchments scraped and re-written. Lean into the archival/cartographic feel — this is NOT a generic SaaS pitch deck.
+- **Avoid**: emoji, AI buzzwords, gradient backgrounds, neon, drop shadows on text, glassmorphism, "AI startup" aesthetics, stock photography of laptops, generic icon-and-bullet templates.
+- **Color palette** (use these exact values):
+
+  ```
+  --parchment:  #F5EFE0   /* page background */
+  --ink:        #2A2A2A   /* body text */
+  --navy:       #0F2A44   /* primary accent, headings */
+  --brick:      #A23E2A   /* highlights, key numbers */
+  --muted:      #8B8378   /* secondary text, slide counter */
+  --rule:       #D9CFB8   /* hairline rules, table borders */
+  ```
+
+- **Typography rules**:
+  - Slide titles: Cormorant Garamond, 700, ~64px, navy, slight letter-spacing.
+  - Body / bullets: Inter, 400, 22–26px, ink color, 1.5 line-height.
+  - Numbers (the "928 places" type): Cormorant Garamond, 700, 96–128px, brick.
+  - Code: JetBrains Mono, 14–16px, charcoal on cream `#EBE3CD`. No syntax highlighting beyond making `event:` keywords brick-red.
+- **Layout rules**:
+  - One core idea per slide. Max 5 bullets, max ~50 words of body copy.
+  - Generous whitespace; never fill more than ~70% of the slide area with text.
+  - Ample top + bottom margins. Slide title is always the same vertical position.
+  - Number-heavy slide: numbers oversized, labels small underneath.
+- **Imagery**:
+  - Background motif: a soft parchment texture (CSS `background-image` with a subtle noise SVG inline) and a faint Manhattan-grid pattern at <10% opacity behind title slides.
+  - All diagrams are inline SVG with thin (1.5px) navy strokes — hand-drawn-map feel, no rounded gradient boxes. No raster images, no clipart.
+  - Decorative motifs: a single fine-line topographic contour curve along the bottom edge of the title slide; nothing else decorative.
+
+### Slide-by-slide content
+
+For each slide, on-screen content is plain bullets / paragraphs. The `Speaker notes` block is hidden by default — render it only inside the floating notes panel that toggles with `n`. The `[design]` hints are for you (Claude) to follow when laying out that specific slide; do not render their text on the slide.
 
 ---
 
-# Slide 1 — Title
+#### Slide 1 — Title
 
 **Palimpsest NYC**
 *An agentic walking tour of Morningside Heights, grounded in public-domain archives.*
@@ -29,13 +75,13 @@
 - Milestone 1 (MVP demo)
 - *(presenter name + date)*
 
-`[design hints]` Big serif title. Small map sliver of UWS + Morningside as a background motif at low opacity. The word "Palimpsest" set apart and slightly larger.
+`[design]` Big serif title centered slightly above the vertical midline. Subtitle in italic Inter, muted color, just below. Three meta lines clustered tightly under the subtitle. Below the meta block, a single thin topographic contour line stretching across the slide. Manhattan grid pattern at <10% opacity behind everything.
 
 *Speaker notes*: "Palimpsest NYC is an agent that plans and narrates a short walking tour through Morningside Heights and the Upper West Side, grounded in public-domain archives. Today I'm showing the Milestone 1 demo: the backend is end-to-end working against a real corpus."
 
 ---
 
-# Slide 2 — The problem
+#### Slide 2 — The problem
 
 **LLMs are confident liars about places.**
 
@@ -43,29 +89,29 @@
 - Vanilla LLMs hallucinate landmarks, dates, and street addresses.
 - The interesting problem isn't "generate prose" — it's **prove every claim came from a real source**.
 
-`[design hints]` Two side-by-side panels. Left: a vague blob labelled "GPT says…" with a wavy citation. Right: a sharp pin on a map with a stable `wikipedia:Cathedral_of_Saint_John_the_Divine` doc_id underneath. Brick-red accent on the right panel.
+`[design]` Two side-by-side panels separated by a hairline rule. Left panel labelled "GPT says…" — a soft fuzzy text blob, ink color, with a wavy underline as the "citation". Right panel labelled "Palimpsest says…" — a single sharp pin marker (SVG) on a tiny map sliver, with a stable doc_id `wikipedia:Cathedral_of_Saint_John_the_Divine` rendered in mono below the pin. Right panel border in brick-red.
 
 *Speaker notes*: "The motivating problem isn't generating prose — that's solved. It's grounding. We want a system where every sentence in the narration is provably traceable to a real, retrieved document. So I built a citation contract that the agent has to satisfy at generation time, and a verifier that rejects responses that don't."
 
 ---
 
-# Slide 3 — V1 MVP scope (what we're shipping)
+#### Slide 3 — V1 MVP scope
 
 **Bounded, demoable, online-only.**
 
 - **Geography**: Morningside Heights + Upper West Side (~5 km² bbox).
-- **Sources (V1)**: Wikipedia/Wikidata + OpenStreetMap. Public-domain only.
+- **Sources**: Wikipedia/Wikidata + OpenStreetMap. Public-domain only.
 - **Agent**: single LLM-callable tool — `search_places`. Multi-turn refinement, max 6 turns.
 - **Citation contract** (locked): every claim carries `doc_id`, `source_url`, `source_type`, `span`, `retrieval_turn`. Verifier rejects responses that violate the contract.
-- **Routing**: server-side PostGIS walk after the agent finishes — the LLM never plans the route.
+- **Routing**: server-side PostGIS walk after the agent finishes. The LLM never plans the route.
 
-`[design hints]` Bounded-bbox map of UWS + Morningside Heights with thin pin clusters. Five-field citation pill on the right with each field labelled. "single tool" callout in brick red.
+`[design]` Two-column layout. Left column: bullets. Right column: a small SVG bbox map of UWS + Morningside Heights with maybe 6–10 thin pin clusters at approximate landmark coordinates (no need for accuracy — just suggest density). Below the map, a five-pill citation card showing the locked field names (`doc_id` / `source_url` / `source_type` / `span` / `retrieval_turn`), each pill outlined in navy.
 
 *Speaker notes*: "V1 is intentionally bounded. One neighborhood, two sources, one tool. The most opinionated decision is that the LLM only ever sees a `search_places` tool. The walking-route optimization is server-side PostGIS — the LLM never has the option to invent an inefficient walk because it has no routing tool to misuse."
 
 ---
 
-# Slide 4 — Architecture
+#### Slide 4 — Architecture
 
 **Five pieces, each minimal.**
 
@@ -83,13 +129,13 @@ React + Vite + MapLibre  ──HTTPS + SSE──▶  FastAPI
 - **LLM router**: two OpenAI-compatible adapters; per-tier circuit breakers; cost telemetry.
 - **Embeddings in-process**: `app.state.embedder`, no external embedding API.
 
-`[design hints]` Replicate the ASCII diagram cleanly with hand-drawn-map style boxes. Highlight the three "shared state" components in navy: postgres, embedder, router. Annotate the SSE arrow in brick red.
+`[design]` Render the architecture as inline SVG (NOT a code block). Five rectangles with thin 1.5px navy borders, hand-drawn-map feel. Connecting arrows in navy with brick-red labels (`HTTPS + SSE`). The three downstream boxes (Postgres / Embedder / Router) sit on a horizontal line, each annotated with their key tech in mono underneath. Three short bullets in a strip below the diagram.
 
 *Speaker notes*: "Five components. Frontend talks to FastAPI over Server-Sent Events — not WebSocket — because the channel is server→client only and SSE is half the proxy config. Postgres carries the corpus with pgvector for semantic search and PostGIS for spatial filters. The embedder runs in-process, so no third-party embedding API. And the LLM router is the cost-aware dispatch layer with per-tier circuit breakers."
 
 ---
 
-# Slide 5 — Current progress (numbers and a live trace)
+#### Slide 5 — Current progress
 
 **Backend demo-ready.**
 
@@ -112,13 +158,13 @@ event: walk         data: {"stops":[{"index":0,"name":"Church of Notre Dame","le
 event: done
 ```
 
-`[design hints]` Numbers in oversized navy. Code block in monospace with brick-red `event:` keywords. Subtle parchment grid lines.
+`[design]` Top half of the slide: the four key numbers in oversized brick (Cormorant Garamond, 96–128px) — `928`, `323`, `100%`, `120` — each with a tiny label in muted Inter underneath (`places`, `documents`, `embedding coverage`, `unit tests`). Bottom half: the SSE trace as a code block with `event:` keywords coloured brick. No chrome around the code; just a hairline rule above and below.
 
 *Speaker notes*: "These numbers aren't projected — the corpus is in postgres right now. 120 unit tests cover the agent loop, the citation verifier, the walk planner, and the SSE framing. The trace at the bottom is from a real run today: kimi-k2.6 calls `search_places`, refines the query, emits narration, the verifier accepts, and the server runs PostGIS routing before the terminal frame."
 
 ---
 
-# Slide 6 — Key technical decisions
+#### Slide 6 — Key technical decisions
 
 **Three opinionated trade-offs.**
 
@@ -126,13 +172,13 @@ event: done
 2. **Citation contract verified at generation time.** `narration` + `citations[]` JSON. Verifier checks doc_id is in the retrieval ledger, source_type matches, retrieval_turn ≤ current; one retry then a visible uncertainty warning. Hallucinated citations cannot reach the user.
 3. **Server-side walking-route, not an LLM tool.** `plan_walk` is PostGIS over the cited place_ids. Removes a whole class of "agent picks a bad route" failure modes.
 
-`[design hints]` Three numbered cards in a row. Each card titled in brick red, body in charcoal. Use a tiny icon for each: scale (cost), check-mark inside a quote (citation), zigzag walking path (route).
+`[design]` Three numbered cards in a horizontal row with equal width, separated by hairline rules (no boxes/borders around the cards themselves). Each card: a large circled numeral (1/2/3) at the top in navy, a one-line title in brick-red, then 2–3 lines of body in ink. No icons. No drop shadows.
 
 *Speaker notes*: "Three decisions worth flagging. First, the router gives us cost-aware dispatch with one env-var flip from free Gemma to paid GPT — that's the basis for the §13.6 cost-vs-quality study. Second, the citation contract is enforced at generation time, not as a post-hoc filter — the agent literally cannot return a response that fails verification. Third, walk planning is server-side, so the LLM doesn't have to do graph optimization."
 
 ---
 
-# Slide 7 — Two weeks to go
+#### Slide 7 — Two weeks to go
 
 **Demo-ready → polished → graded.**
 
@@ -142,13 +188,13 @@ event: done
 | **Week +2** | Free-vs-paid cost analysis, ~10 walks (§13.6). Final-report draft incl. agentic-engineering chapter (§13.7). 30-second demo video (§13.8). |
 | **Deferred to v2** | Chronicling America / NYPL / NYC Open Data / MTA / NOAA. VPS deploy. On-device LLM. User study. |
 
-`[design hints]` Two-column timeline, weeks side by side. Strikethrough the v2 row in muted gray. A small "deferred ⇢ v2" tag.
+`[design]` Two-row timeline. The first two rows (Week +1, Week +2) in normal navy/ink. The third row (Deferred to v2) styled at reduced opacity (~50%) with a small brick-red "v2" tag at the right edge. Hairline rules between rows. No table borders.
 
 *Speaker notes*: "Two weeks left. The biggest user-visible piece is the frontend `EventSource` consumer that renders the walk on the map. Then qualitative eval over five walks, the free-vs-paid cost study, the report draft, and a 30-second demo video. Five live data sources and the VPS deploy are explicitly deferred to v2 — they're spec-tracked, not abandoned."
 
 ---
 
-# Slide 8 — The agentic engineering angle (and Q&A)
+#### Slide 8 — The agentic engineering angle (and Q&A)
 
 **The codebase is itself a dataset.**
 
@@ -159,15 +205,15 @@ event: done
 
 **Questions?**
 
-`[design hints]` Centered title in navy serif. The bullets in two short lines beneath. Big "Questions?" centered, brick-red. Subtle palimpsest texture in background.
+`[design]` Title and subtitle in the upper third. Bullets in the middle third, single column, generous line-height. Bottom third: the word **Questions?** centered in big serif brick-red. A subtle palimpsest texture (faint horizontal scrape lines) covers the entire slide background at <8% opacity.
 
 *Speaker notes*: "One thing that's unusual about this project: it's been written end-to-end by Claude Code under a single human reviewer. Every session — every prompt, every tool call, every cost — is logged to JSONL. So the final report won't just describe the system; it'll quantify what it cost to build, how long each phase took, and where the agent failed. That dataset is itself a Big Data artifact for the course. Happy to take questions."
 
 ---
 
-## Appendix slides (use only if the timer permits, otherwise skip)
+### Optional appendix slides (only render slides 9–11 if I tell you to; otherwise omit)
 
-### A1 — Citation contract (the locked JSON)
+#### A1 — Citation contract (the locked JSON)
 
 ```json
 {
@@ -187,14 +233,13 @@ event: done
 Verifier rules (paraphrased): doc_id in ledger; source_type ∈ V1 enum;
 source_url matches retrieved row; retrieval_turn ≤ current_turn; span opaque.
 
-### A2 — Why kimi-k2.6 takes 5 minutes per walk
+#### A2 — Why kimi-k2.6 takes 5 minutes per walk
 
 - Extended-thinking model: ~50–100s/turn just on reasoning tokens.
 - Final-turn `max_tokens=8192` so reasoning + JSON output both fit.
-- One env-var flip to a non-thinking model collapses end-to-end latency
-  to ~30s with no code change. That's the §13.6 paid-eval setup.
+- One env-var flip to a non-thinking model collapses end-to-end latency to ~30s with no code change. That's the §13.6 paid-eval setup.
 
-### A3 — Risk register (short)
+#### A3 — Risk register
 
 | Risk | Mitigation |
 |---|---|
@@ -205,7 +250,21 @@ source_url matches retrieved row; retrieval_turn ≤ current_turn; span opaque.
 
 ---
 
-## Notes for the presenter (NOT slide content)
+### Build instructions (final pass before you produce the artifact)
+
+1. Render slides 1–8 in order. Skip the appendix unless told otherwise.
+2. Use the exact color palette and font stack above. Do not introduce other colors or fonts.
+3. Implement the keyboard nav, slide counter, progress bar, and speaker-notes toggle as specified.
+4. Inline SVG for the architecture diagram (slide 4) and the bbox map + citation pills (slide 3). No external image URLs.
+5. Make the deck print cleanly to PDF with one slide per page; speaker notes must NOT print.
+6. Include a `<title>` of `Palimpsest NYC — Milestone 1`.
+7. Validate that all slides fit at 1280×720 without scrolling. If a slide overflows, reduce body copy rather than shrinking the title.
+
+When you're done, output **only the artifact** — no commentary, no recap.
+
+---
+
+## Notes for the presenter (NOT slide content; for me, not for Claude)
 
 - **Open the talk by naming the problem, not the project.** "LLMs are confident liars about places" lands harder than "we built a thing".
 - **Keep one slide on numbers, one on the trace.** Don't dilute either.
