@@ -1,0 +1,2 @@
+# Reserve data/ for ingestion tiers (raw/bronze/silver on the dev box).
+# All subdirs except this .gitkeep are ignored.
