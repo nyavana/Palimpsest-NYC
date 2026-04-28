@@ -64,8 +64,11 @@ COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /app /app
 COPY apps/worker /tmp/worker
 
-# Make sure logs/ exists and is writable
-RUN mkdir -p /app/logs/claude-sessions && chown -R app:app /app /opt/venv /tmp/worker
+# Make sure logs/ and the HF cache mountpoint exist with app:app ownership.
+# Named volumes inherit the mountpoint's ownership at first attach, so this
+# avoids a chown-on-startup dance for the non-root container.
+RUN mkdir -p /app/logs/claude-sessions /cache/huggingface \
+    && chown -R app:app /app /opt/venv /tmp/worker /cache
 
 USER app
 

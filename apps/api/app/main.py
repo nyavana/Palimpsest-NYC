@@ -15,6 +15,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app import __version__
 from app.config import Settings, get_settings
+from app.db.engine import build_engine, build_session_factory
+from app.embeddings import build_embedder
 from app.llm.cache import CacheTtl, LLMCache
 from app.llm.router import build_llm_router
 from app.llm.telemetry import TelemetrySink
@@ -75,6 +77,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         cb_cooldown_s=settings.llm_router.cb_cooldown_s,
     )
 
+    # Database (async SQLAlchemy)
+    engine = build_engine(settings.postgres)
+    app.state.db_engine = engine
+    app.state.db_session_factory = build_session_factory(engine)
+
+    # Sentence-transformers embedder singleton — loaded once, ~30MB weights
+    # read from /cache/huggingface (mounted volume).
+    log.info("embedder.loading", model=settings.embeddings.model)
+    app.state.embedder = build_embedder(settings.embeddings)
+    log.info("embedder.ready", dim=app.state.embedder.dim)
+
     # Meta-instrumentation harness (populated in task 9)
     from app.meta.session_log import SessionLogger
 
@@ -85,6 +98,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     finally:
         log.info("api.shutdown")
         await app.state.llm_router.aclose()
+        await engine.dispose()
         await redis_client.aclose()
 
 

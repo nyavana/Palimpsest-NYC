@@ -90,11 +90,11 @@
 
 > **V1 migration mechanism (per `swap-llm-tiers-and-lock-mvp-decisions`)**: SQL files in `apps/api/app/db/migrations/` are mounted into the postgres container via `docker-entrypoint-initdb.d` and run on first volume creation. **No Alembic, no runtime applier.** Schema changes during V1 dev require `make nuke && make up`. Idempotent runtime applier with `schema_migrations` ledger is deferred to v2.
 
-- [ ] 10.1 Create `apps/api/app/db/engine.py` async SQLAlchemy engine and session factory
-- [ ] 10.2 Create `apps/api/app/db/models.py` with `Place`, `Document`, `Embedding` ORM classes
-- [ ] 10.3 Create `apps/api/app/db/migrations/0001_init.sql` enabling `postgis`, `pgvector`, `pg_trgm`. Mount this directory into postgres via `docker-entrypoint-initdb.d` (single execution surface for V1).
-- [ ] 10.4 Create `apps/api/app/db/migrations/0002_places.sql` with the `places` and `documents` tables. Embedding columns declared as **`vector(384)`** (locked to `BAAI/bge-small-en-v1.5` output dim).
-- [ ] 10.5 Create `apps/api/app/embeddings/` module with a `sentence-transformers` singleton attached to `app.state.embedder` at startup; reads `EMBEDDING_MODEL`, `EMBEDDING_DIM`, `EMBEDDING_BATCH_SIZE` from settings; first-run downloads to mounted `/cache/huggingface`.
+- [x] 10.1 Create `apps/api/app/db/engine.py` async SQLAlchemy engine and session factory
+- [x] 10.2 Create `apps/api/app/db/models.py` with `Place`, `Document` ORM classes (`Embedding` is a typed `Vector(384)` column, not a separate table — locked V1 schema)
+- [x] 10.3 Create `apps/api/app/db/migrations/0001_init.sql` enabling `postgis`, `pgvector`, `pg_trgm`. Mount this directory into postgres via `docker-entrypoint-initdb.d` (single execution surface for V1).
+- [x] 10.4 Create `apps/api/app/db/migrations/0002_places.sql` with the `places` and `documents` tables. Embedding columns declared as **`vector(384)`** (locked to `BAAI/bge-small-en-v1.5` output dim).
+- [x] 10.5 Create `apps/api/app/embeddings/` module with a `sentence-transformers` singleton attached to `app.state.embedder` at startup; reads `EMBEDDING_MODEL`, `EMBEDDING_DIM`, `EMBEDDING_BATCH_SIZE` from settings; first-run downloads to mounted `/cache/huggingface`.
 
 ## 11. Full Ingestion Pipelines (Week 2)
 
