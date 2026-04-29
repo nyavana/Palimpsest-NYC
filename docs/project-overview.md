@@ -82,7 +82,7 @@ These constraints are load-bearing — relaxing any one of them requires an Open
 - **Schema is migrations-first.** `apps/api/app/db/models.py` is a typed read-only mirror of `apps/api/app/db/migrations/*.sql`. ORM `create_all` is never used in app code paths. Schema changes require `make nuke && make up`.
 - **Citation contract is closed-set.** Every citation must carry the five fields `doc_id`, `source_url`, `source_type`, `span`, `retrieval_turn`, and `source_type` is restricted to `{wikipedia, wikidata, osm}` in V1. Adding a source means amending `V1_SOURCE_TYPES` and the agent system prompt together.
 - **Complexity is the only router knob.** Callers pass `complexity ∈ {simple, standard, complex}`; the router selects backend, cache TTL, and breaker accounting. No caller-side backend selection or cache bypass.
-- **Embedding dimension is locked at 384.** The `EMBEDDING_DIM` constant in `models.py` tracks the `EMBEDDING_DIM` env var. Changing the embedder requires a migration that drops and recreates the `vector(384)` column.
+- **Embedding dimension is locked at 384.** The `EMBEDDING_DIM` constant in `apps/api/app/db/models.py` is hardcoded to match the `vector(384)` column type and the `BAAI/bge-small-en-v1.5` embedder's output dimension. Changing the embedder requires a migration that drops and recreates the `vector(384)` column and bumps this constant in lockstep.
 - **Each Python subproject owns its own venv.** `apps/api` and `apps/worker` each have their own `.venv`. No system Python installs; `make setup` is the entry point (uses `uv` if available, else stdlib `venv` + `pip`).
 - **Hard turn cap of 6 in the agent loop.** Hitting the cap is a hard failure (`AgentLoopError`). The final turn strips the tool surface and forces a JSON terminal response with `max_tokens=8192`.
 
@@ -95,12 +95,12 @@ This project uses [OpenSpec](https://github.com/fission-ai/openspec) for spec-dr
 - **Active:** [`openspec/changes/initial-palimpsest-scaffold/`](../openspec/changes/initial-palimpsest-scaffold/) — proposal, design, tasks, and capability specs for the V1 build.
 - **Locked decisions:** [`openspec/changes/swap-llm-tiers-and-lock-mvp-decisions/`](../openspec/changes/swap-llm-tiers-and-lock-mvp-decisions/) — captures the V1 decisions that are deliberately frozen (LLM router rename, embedding model, citation contract, license).
 
-Inspect changes locally:
+Inspect changes locally (make targets wrap the openspec CLI):
 
 ```bash
-openspec list
-openspec show initial-palimpsest-scaffold
-openspec status --change initial-palimpsest-scaffold
+make spec-list      # → openspec list
+make spec-show      # → openspec show initial-palimpsest-scaffold
+make spec-validate  # → openspec validate initial-palimpsest-scaffold --strict
 ```
 
 ---
