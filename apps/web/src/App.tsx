@@ -1,26 +1,39 @@
-import { MapView } from "@/components/MapView";
-import { ChatPane } from "@/components/ChatPane";
-
 /**
- * Palimpsest NYC shell — map on the left, chat pane on the right.
+ * Palimpsest NYC shell — map fills the main pane, chat lives in the aside.
  *
- * The map is rendered via the MapEngine abstraction, so the concrete
- * engine (MapLibre today, Google Photorealistic 3D Tiles later) is
- * selected from `VITE_MAP_ENGINE` and swappable in a single factory file.
+ * Both panes consume the same `useAgentSession()` so the chat reads agent
+ * state and the map can draw the walk that the agent's citations resolved
+ * to (via plan_walk on the server).
+ *
+ * The MapEngine handle is shared via `MapEngineProvider` so the walk
+ * timeline's "fly to" buttons can animate the same map instance that
+ * MapView mounted, without breaking the engine boundary.
  */
+
+import { ChatPane } from "@/components/ChatPane";
+import { MapView } from "@/components/MapView";
+import { MapEngineProvider } from "@/state/MapEngineContext";
+import { useAgentSession } from "@/state/useAgentSession";
+
 export default function App() {
+  const session = useAgentSession();
+
   return (
-    <div className="flex h-full w-full flex-row">
-      <main className="relative flex-1">
-        <MapView />
-        <header className="pointer-events-none absolute left-4 top-4 rounded bg-ink/80 px-3 py-2 font-serif text-parchment shadow">
-          <h1 className="text-lg">Palimpsest NYC</h1>
-          <p className="text-xs opacity-70">Walking tours of Morningside Heights & UWS</p>
-        </header>
-      </main>
-      <aside className="w-96 border-l border-ink/10 bg-parchment p-4">
-        <ChatPane />
-      </aside>
-    </div>
+    <MapEngineProvider>
+      <div className="flex h-full w-full flex-col lg:flex-row">
+        <main className="relative h-[55vh] w-full flex-1 lg:h-full">
+          <MapView stops={session.state.walk} />
+          <header className="pointer-events-none absolute left-4 top-4 rounded bg-ink/85 px-3 py-2 font-serif text-parchment shadow-chip backdrop-blur-sm">
+            <h1 className="text-h2 font-semibold leading-tight">Palimpsest NYC</h1>
+            <p className="text-small font-sans opacity-80">
+              Walking tours of Morningside Heights & UWS
+            </p>
+          </header>
+        </main>
+        <aside className="h-[45vh] w-full border-l border-hairline lg:h-full lg:w-[28rem]">
+          <ChatPane session={session} />
+        </aside>
+      </div>
+    </MapEngineProvider>
   );
 }

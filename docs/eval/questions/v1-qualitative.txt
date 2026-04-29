@@ -1,0 +1,12 @@
+# Five hand-curated questions for §13.4 qualitative review.
+# Each is intended to probe a different angle of the agent loop:
+#  1. Direct landmark lookup (single citation expected)
+#  2. Comparative / multi-place narration
+#  3. Theme-based ("art deco", "gothic") retrieval over the corpus
+#  4. Geographic constraint ("near Riverside Park") tests place_search filter
+#  5. Out-of-scope / negative test (Brooklyn) — should refuse or redirect
+Tell me about the gothic cathedral on Amsterdam Avenue.
+What can you tell me about Riverside Church and its history?
+Plan a 30-minute walking tour of art deco buildings along Riverside Drive.
+What interesting places are within 400 meters of Riverside Park around 110th Street?
+Take me on a walking tour of brownstone neighborhoods in Brooklyn.

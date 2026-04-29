@@ -10,7 +10,7 @@
     "preview": "vite preview --port 5173",
     "lint": "eslint .",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b"
   },
   "prettier": {
     "semi": true,
@@ -26,6 +26,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@types/node": "^25.6.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",

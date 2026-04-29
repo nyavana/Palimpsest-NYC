@@ -1,0 +1,16 @@
+# Ten questions used in §13.6 router cost analysis.
+# The same 10 prompts are run twice — once with the default free Gemma router
+# config, once with a paid OpenAI config — so we can compare $/walk and
+# latency holding the prompt distribution constant. Mix of single-place,
+# multi-place, theme, and geographic queries to exercise both `standard` and
+# `complex` routes.
+Tell me about the Cathedral of Saint John the Divine.
+What is Grant's Tomb and why is it in this neighborhood?
+Plan a walking tour of three Columbia University landmarks.
+Describe the architecture of Riverside Church.
+What can I see if I walk from Low Plaza to Morningside Park?
+Show me art-history landmarks in Morningside Heights.
+What's the history of the Apollo Theater? (note: out of v1 scope)
+Plan a 45-minute walk that hits a park, a church, and a university building.
+What are some lesser-known places in the Upper West Side worth a visit?
+Tell me about the buildings around 116th and Broadway.

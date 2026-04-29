@@ -122,6 +122,19 @@ When the agent generates narration, the prompt contract requires it to output a 
 
 A verifier pass checks that every citation points to a document actually retrieved in this turn, and that the narration's claims map to at least one citation per sentence (best-effort). Narrations that fail verification are re-generated once, then surfaced with a visible uncertainty warning.
 
+### 8. Frontend visual design runs through the `/ui-ux-pro-max:ui-ux-pro-max` skill before any component is written
+
+The frontend has been a typed scaffold (Vite + React + TS + Tailwind + MapEngine) since Week 1, but no opinionated UI exists yet — `App.tsx`, `ChatPane.tsx`, and `MapView.tsx` are minimal wiring. Hand-rolling Tailwind on top of that scaffold reliably produces a generic LLM-app aesthetic (gray cards, muted accents, default Inter, neutral spacing) that will not read well in an EECS E6895 demo.
+
+The `/ui-ux-pro-max:ui-ux-pro-max` skill encapsulates a curated design system (50+ styles, 161 palettes, 57 font pairings, 99 UX guidelines, 25 chart types) tuned for the React + Tailwind stack already locked in. We make it the **mandatory first step** of any frontend visual work — not a polish pass at the end:
+
+1. **Plan/design** — invoke the skill with `action: design`, `stack: React + Tailwind`, `product: agentic walking-tour app`. The skill returns a brief covering layout, palette, typography, components, and interaction primitives.
+2. **Persist** — the brief is committed to `docs/frontend/ui-design-brief.md` and the chosen tokens to `apps/web/src/styles/tokens.ts` so subsequent sessions and the final report can reference what was decided and why.
+3. **Implement** — components are built against the brief, importing only the `MapEngine` interface for map work (per Decision 3) and only the token module for visual choices.
+4. **Review** — invoke the skill again with `action: review` over the implemented surface; address severity ≥ medium findings before the task closes.
+
+Tasks §12.5.1–12.5.4 encode this workflow. `apps/web/eslint.config.js` and the existing MapEngine boundary remain authoritative for code-level constraints; the skill governs visual and UX choices, not architecture.
+
 ## Risks / Trade-offs
 
 | Risk | Likelihood | Impact | Mitigation |

@@ -1,0 +1,6 @@
+node_modules
+dist
+.tsbuildinfo-node
+*.tsbuildinfo
+.playwright-cli
+palimpsest-*.png

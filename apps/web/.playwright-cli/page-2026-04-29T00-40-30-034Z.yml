@@ -1,0 +1,34 @@
+- generic [ref=e3]:
+  - main [ref=e4]:
+    - generic [ref=e5]:
+      - region "Map" [ref=e6]
+      - generic:
+        - generic [ref=e7]:
+          - button "Zoom in" [ref=e8] [cursor=pointer]
+          - button "Zoom out" [ref=e10] [cursor=pointer]
+          - button "Reset bearing to north" [ref=e12]
+        - generic [ref=e14]: 100 m
+        - group [ref=e15]:
+          - generic "Toggle attribution" [ref=e16] [cursor=pointer]
+          - generic [ref=e17]: © OpenStreetMap contributors
+    - generic:
+      - heading "Palimpsest NYC" [level=1]
+      - paragraph: Walking tours of Morningside Heights & UWS
+  - complementary [ref=e18]:
+    - generic [ref=e19]:
+      - generic [ref=e20]:
+        - heading "Ask Palimpsest" [level=2] [ref=e21]
+        - paragraph [ref=e22]: Walking tours of Morningside Heights & the Upper West Side, grounded in the public-domain archive.
+      - generic [ref=e24]:
+        - heading "Narration" [level=3] [ref=e25]
+        - paragraph [ref=e26]:
+          - text: Ask a question to start a walk. Try
+          - emphasis [ref=e27]: “Tell me about a gothic cathedral in Morningside Heights”
+          - text: .
+      - generic [ref=e28]:
+        - generic [ref=e29]: Ask Palimpsest a question
+        - textbox "Ask Palimpsest a question" [ref=e30]:
+          - /placeholder: Take me on a walk near Columbia…
+        - button "Ask" [ref=e31] [cursor=pointer]:
+          - generic [ref=e32]: Ask
+          - img [ref=e33]

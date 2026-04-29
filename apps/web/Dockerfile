@@ -6,10 +6,10 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-COPY apps/web/package.json apps/web/package-lock.json* ./
-RUN npm ci --prefer-offline --no-audit 2>/dev/null || npm install --no-audit
+COPY package.json package-lock.json* ./
+RUN npm ci --prefer-offline --no-audit 2>/dev/null || npm install --no-audit --legacy-peer-deps
 
-COPY apps/web/ ./
+COPY . ./
 
 ARG VITE_API_BASE_URL=http://localhost:8000
 ARG VITE_MAP_ENGINE=maplibre
@@ -24,7 +24,7 @@ RUN npm run build
 
 FROM nginx:1.27-alpine AS runtime
 
-COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 EXPOSE 80

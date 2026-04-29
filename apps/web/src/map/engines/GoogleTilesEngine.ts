@@ -18,10 +18,13 @@ const UPGRADE_DOC_HINT =
   "Tracked in openspec/changes/initial-palimpsest-scaffold/tasks.md §8.4 (GoogleTilesEngine).";
 
 export class GoogleTilesEngine implements MapEngine {
-  constructor(private readonly apiKey: string) {
+  constructor(apiKey: string) {
     if (!apiKey) {
       throw new Error("GoogleTilesEngine requires VITE_GOOGLE_MAP_TILES_API_KEY to be set.");
     }
+    // apiKey is captured in the closure once we wire CesiumJS in. For the
+    // stub it just needs to be present so misconfiguration fails fast.
+    void apiKey;
   }
 
   async init(_container: HTMLElement, _initialView: Viewport): Promise<void> {

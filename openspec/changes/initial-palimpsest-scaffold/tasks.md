@@ -113,16 +113,20 @@
 - [x] 12.2 Implement narration generator with mandatory citation JSON contract — narration is the agent's terminal response; no separate "narrate" tool. Five required Citation fields: `doc_id`, `source_url`, `source_type`, `span`, `retrieval_turn`. *Lives at `apps/api/app/agent/loop.py`; system prompt enforces the JSON shape, verifier enforces the contract.*
 - [x] 12.3 Implement citation verifier pass — verifies `doc_id`, `source_type`, `retrieval_turn`; **`span` is opaque to the verifier** (per locked contract). *Lives at `apps/api/app/agent/citations.py`; 14 verifier scenarios covered by `tests/test_agent_citations.py`.*
 - [x] 12.4 Wire **Server-Sent Events** streaming of narration chunks to the frontend (replaces WebSocket per `swap-llm-tiers-and-lock-mvp-decisions`). Frontend uses native `EventSource`. *Lives at `apps/api/app/routes/agent.py`; nginx.conf has the `proxy_buffering off` block.*
-- [ ] 12.5 Frontend: render walk as a path + stop markers + fly-to animation per stop, using the ordered route from §12.1.
+- [x] 12.5 Frontend: render walk as a path + stop markers + fly-to animation per stop, using the ordered route from §12.1.
+  - [x] 12.5.1 **Design pass via `/ui-ux-pro-max:ui-ux-pro-max`** — invoke the skill (action: `design`, stack: `React + Tailwind`, product: `agentic walking-tour app`) to produce the visual brief for the v1 UI: layout grid, color palette, font pairing, component inventory (chat composer, narration stream, citation card, walk timeline, fly-to controls, loading + warning states), and interaction primitives. Capture the brief at `docs/frontend/ui-design-brief.md` and the chosen tokens at `apps/web/src/styles/tokens.ts`. This step runs **before** any new component code is written so the implementation in 12.5.2–12.5.3 has a single source of truth. See design.md §8.
+  - [x] 12.5.2 Implement the chat → narration → citations panel from the brief, wired to the SSE `EventSource` from §12.4. Citation cards render the locked five-field contract (`doc_id`, `source_url`, `source_type`, `span`, `retrieval_turn`).
+  - [x] 12.5.3 Render the ordered walk on the map (path layer + stop markers + fly-to animation per stop) through the `MapEngine` interface only — no direct `maplibre-gl` imports outside `apps/web/src/map/engines/` (per spec `map-engine`, lint-enforced).
+  - [x] 12.5.4 Design review pass via `/ui-ux-pro-max:ui-ux-pro-max` (action: `review`) over the implemented surface; address issues flagged at severity ≥ medium before declaring 12.5 complete. *Findings addressed: (1) `cancel()` left composer stuck in busy state — reducer now transitions to `done`; (2) `LoadingSkeleton` was rendering on `error`/`done` with empty narration — now gated to `asking`/`streaming`; (3) two `<h1>` on the page violated heading hierarchy — aside header demoted to `<h2>`, section labels to `<h3>`; (4) `WarningBanner` now uses `role="alert"` + `aria-live="polite"` so the connection-lost message announces.*
 
 ## 13. Live Data + Evaluation + Paper (Week 4)
 
-- [ ] 13.1 ~~NYC Open Data events ingestion (daily cron via worker)~~ **Deferred to v2.**
-- [ ] 13.2 ~~MTA GTFS-RT subway status feed~~ **Deferred to v2.**
-- [ ] 13.3 ~~NOAA Weather overlay~~ **Deferred to v2.**
-- [ ] 13.4 V1 evaluation: **qualitative hand-graded review of 5 walks**, capture screenshots and citation correctness rate. (P@5/R@5 + factuality LLM-judge + latency percentiles deferred to v2.)
-- [ ] 13.5 ~~User study: 5-10 classmates rate 3 walks each on accuracy and interestingness~~ **Deferred to v2 (post-grading).**
-- [ ] 13.6 Router cost analysis: ~10-walk sample comparing free Gemma vs paid OpenAI models (single env-var flip of `OPENROUTER_STANDARD_MODEL` / `OPENROUTER_COMPLEX_MODEL`).
+- [x] 13.1 ~~NYC Open Data events ingestion (daily cron via worker)~~ **Deferred to v2.**
+- [x] 13.2 ~~MTA GTFS-RT subway status feed~~ **Deferred to v2.**
+- [x] 13.3 ~~NOAA Weather overlay~~ **Deferred to v2.**
+- [x] 13.4 V1 evaluation: **qualitative hand-graded review of 5 walks**, capture screenshots and citation correctness rate. (P@5/R@5 + factuality LLM-judge + latency percentiles deferred to v2.) *3/5 walks emitted verified citations; 1 client-side timeout (since fixed at 300 s in the harness); 1 graceful out-of-scope refusal. JSONL: `docs/eval/results/v1-qualitative-2026-04-29T00-18-48Z.jsonl`. Findings in `docs/eval/v1-eval-report.md` §13.4.*
+- [x] 13.5 ~~User study: 5-10 classmates rate 3 walks each on accuracy and interestingness~~ **Deferred to v2 (post-grading).**
+- [x] 13.6 Router cost analysis: ~10-walk sample comparing free Gemma vs paid OpenAI models (single env-var flip of `OPENROUTER_STANDARD_MODEL` / `OPENROUTER_COMPLEX_MODEL`). *10 walks each on `moonshotai/kimi-k2.6` ($0.3038) vs `openai/gpt-oss-120b:free` ($0.0000). Free model wins on cost, latency (4× faster), reliability (80% vs 70% verified), and walk-distance discipline. Single-env-flip script: `docs/eval/scripts/swap-to-free-model.sh`. Full table in `docs/eval/v1-router-comparison.md`; analysis in `docs/eval/v1-eval-report.md` §13.6.*
 - [ ] 13.7 Final report draft with agentic-engineering chapter sourced from session-log JSONL.
 - [ ] 13.8 30-second demo video.
 
@@ -130,8 +134,8 @@
 
 V1 demo runs on the grader's localhost via `docker compose up`. VPS bring-up is tracked separately when v2 work resumes.
 
-- [ ] 14.1 ~~VPS bootstrap playbook (docker, caddy, unattended-upgrades)~~ **Deferred to v2.**
-- [ ] 14.2 ~~Postgres tuning for 2.5 GB RAM (shared_buffers, work_mem, max_connections)~~ **Deferred to v2.**
-- [ ] 14.3 ~~pg_dump from dev silver to VPS gold~~ **Deferred to v2.**
-- [ ] 14.4 ~~Caddy reverse proxy with automatic HTTPS~~ **Deferred to v2.**
-- [ ] 14.5 ~~Smoke test on VPS end-to-end~~ **Deferred to v2.**
+- [x] 14.1 ~~VPS bootstrap playbook (docker, caddy, unattended-upgrades)~~ **Deferred to v2.**
+- [x] 14.2 ~~Postgres tuning for 2.5 GB RAM (shared_buffers, work_mem, max_connections)~~ **Deferred to v2.**
+- [x] 14.3 ~~pg_dump from dev silver to VPS gold~~ **Deferred to v2.**
+- [x] 14.4 ~~Caddy reverse proxy with automatic HTTPS~~ **Deferred to v2.**
+- [x] 14.5 ~~Smoke test on VPS end-to-end~~ **Deferred to v2.**

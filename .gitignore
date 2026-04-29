@@ -2,6 +2,7 @@
 .env
 .env.local
 .env.*.local
+.env.before-swap
 !.env.example
 
 # ───────────────────────────── Python ──────────────────────────────────
@@ -11,6 +12,7 @@ __pycache__/
 *.so
 .Python
 .venv/
+.eval-venv/
 venv/
 env/
 ENV/
@@ -61,6 +63,10 @@ data/silver/
 logs/
 !logs/.gitkeep
 !logs/claude-sessions/.gitkeep
+
+# ───────────────────────────── Eval results ────────────────────────────
+# JSONL eval output is local analysis data, not committed source
+docs/eval/results/
 
 # ───────────────────────────── IDE / OS ────────────────────────────────
 .vscode/

@@ -1,45 +1,50 @@
-import { useState } from "react";
-
 /**
- * Minimal chat pane stub.
+ * ChatPane — composes the aside column from the session state.
  *
- * Week 1: renders a disabled input with a placeholder.
- * Week 3: will stream agent responses over WebSocket (/agent/ask).
+ * Owns the agent session and feeds slices of state into the dumb child
+ * components. The walk is rendered on the map by App's effect; this pane
+ * only renders the timeline + fly-to controls.
  */
-export function ChatPane() {
-  const [value, setValue] = useState("");
+
+import { useAgentSession } from "@/state/useAgentSession";
+
+import { CitationList } from "./CitationList";
+import { Composer } from "./Composer";
+import { NarrationStream } from "./NarrationStream";
+import { WalkTimeline } from "./WalkTimeline";
+import { WarningBanner } from "./WarningBanner";
+
+type Props = {
+  /** Hook factory injected so App can share the session with MapView. */
+  session: ReturnType<typeof useAgentSession>;
+};
+
+export function ChatPane({ session }: Props) {
+  const { state, ask, cancel } = session;
+  const busy = state.status === "asking" || state.status === "streaming";
 
   return (
-    <div className="flex h-full flex-col">
-      <h2 className="mb-3 font-serif text-xl">Ask Palimpsest</h2>
-      <p className="mb-4 text-sm text-ink/70">
-        Type a place or ask for a walking tour. The agent loop ships in Week 3.
-      </p>
-      <div className="flex-1 overflow-y-auto rounded border border-ink/10 bg-white/50 p-3 text-sm">
-        <em className="text-ink/50">No conversation yet.</em>
-      </div>
-      <form
-        className="mt-3 flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          // eslint-disable-next-line no-console
-          console.log("ask:", value);
-          setValue("");
-        }}
-      >
-        <input
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="Take me on a walk near Columbia…"
-          className="flex-1 rounded border border-ink/20 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ink/30"
+    <div className="flex h-full flex-col bg-parchment">
+      <header className="space-y-1 border-b border-hairline px-4 py-4">
+        <h2 className="font-serif text-display font-semibold text-ink">Ask Palimpsest</h2>
+        <p className="text-small text-ink-muted">
+          Walking tours of Morningside Heights & the Upper West Side, grounded in the public-domain
+          archive.
+        </p>
+      </header>
+
+      <div className="flex-1 overflow-y-auto">
+        <NarrationStream state={state} />
+        <WarningBanner warnings={state.warnings} />
+        <CitationList
+          citations={state.citations}
+          walk={state.walk}
+          verified={state.result?.verified ?? null}
         />
-        <button
-          type="submit"
-          className="rounded bg-ink px-3 py-2 text-sm text-parchment hover:bg-ink/80"
-        >
-          Ask
-        </button>
-      </form>
+        <WalkTimeline stops={state.walk} />
+      </div>
+
+      <Composer busy={busy} onAsk={ask} onCancel={cancel} />
     </div>
   );
 }
