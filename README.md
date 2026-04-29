@@ -72,8 +72,10 @@ The SSE stream emits the following frames in order:
 | `turn` | each LLM turn boundary |
 | `tool_call` | the agent invokes `search_places` |
 | `tool_result` | matched documents come back from postgres |
+| `tool_error` | a tool invocation raised — the loop continues with the error fed back to the LLM |
 | `narration` | terminal JSON payload with the prose |
 | `citations` | terminal JSON payload with the cited documents |
+| `warning` | non-fatal verifier warning (e.g. citation retry exhausted with `verified=False`) |
 | `walk` | server-side `plan_walk` over the cited place IDs |
 | `done` | terminal marker after walk planning |
 
