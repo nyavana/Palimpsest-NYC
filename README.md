@@ -8,13 +8,13 @@
 
 *The "Ask Palimpsest" panel on the right streams a citation-grounded narration over Server-Sent Events while the map flies between cited places on the left.*
 
-Palimpsest plans a short walking tour for a bounded slice of NYC and narrates it from free, public-domain sources — Wikipedia/Wikidata and OpenStreetMap. Every claim the agent makes is cited under a strict five-field contract that is verified at generation time, so the narration cannot reference a place the agent did not actually retrieve.
+Palimpsest plans a short walking tour for a bounded slice of NYC and narrates it from free, public-domain sources: Wikipedia/Wikidata and OpenStreetMap. Every claim the agent makes is cited under a strict five-field contract that is verified at generation time, so the narration cannot reference a place the agent did not actually retrieve.
 
 The bounded slice is by design: the corpus covers roughly 5km² around Morningside Heights and the Upper West Side, populated from Wikipedia, Wikidata, and the OSM Overpass API. Within that footprint the agent runs a single-tool retrieval loop with a hard 6-turn cap, a JSON terminal contract, and one corrective retry. The loop's narrowness is what makes the citation guarantees enforceable.
 
 ## Features
 
-The four properties below are design constraints, not aspirational goals — they are enforced in code:
+The four properties below are enforced in code, not aspirational:
 
 - Plans short walking tours from a free, public-domain archive (Wikipedia/Wikidata + OpenStreetMap).
 - Single-tool agentic loop with a hard turn cap and a JSON terminal contract.
@@ -25,7 +25,7 @@ The four properties below are design constraints, not aspirational goals — the
 
 Prereqs: Docker (with `compose` v2), `uv` (or Python 3.12 + `venv`), Node 20+. You will need an `OPENROUTER_API_KEY`.
 
-Bring up the full stack — Postgres + PostGIS + pgvector, Redis, the FastAPI API, the heartbeat worker, and the React web app — with a single command:
+Bring up the full stack (Postgres + PostGIS + pgvector, Redis, the FastAPI API, the heartbeat worker, and the React web app) with a single command:
 
 ```bash
 # 1. configure environment
@@ -63,7 +63,7 @@ docker compose exec api python -m app.ingest.cli wikipedia run
 curl -N "http://localhost:8000/agent/ask?q=Tell+me+about+a+gothic+cathedral+in+Morningside+Heights"
 ```
 
-Re-running ingestion is idempotent — rows are upserted by their stable provenance keys.
+Re-running ingestion is idempotent; rows are upserted by their stable provenance keys.
 
 The SSE stream emits the following frames in order:
 
@@ -72,7 +72,7 @@ The SSE stream emits the following frames in order:
 | `turn` | each LLM turn boundary |
 | `tool_call` | the agent invokes `search_places` |
 | `tool_result` | matched documents come back from postgres |
-| `tool_error` | a tool invocation raised — the loop continues with the error fed back to the LLM |
+| `tool_error` | a tool invocation raised; the loop continues with the error fed back to the LLM |
 | `narration` | terminal JSON payload with the prose |
 | `citations` | terminal JSON payload with the cited documents |
 | `warning` | non-fatal verifier warning (e.g. citation retry exhausted with `verified=False`) |
@@ -90,7 +90,7 @@ The agent runs as a streamed multi-turn loop:
 5. **Plan walk.** A server-side `plan_walk` step orders the cited place IDs into a route with leg distances.
 6. **Stream to client.** Each stage emits an SSE frame; the React client renders narration and triggers `flyTo` on the map as frames arrive.
 
-The loop is intentionally narrow: exactly one tool, exactly one terminal response shape, no branching after citations are verified. That narrowness is what makes each invariant easy to test in isolation and easy to reason about when something fails.
+The loop is intentionally narrow: one tool, one terminal response shape, and no branching once citations are verified. That keeps each invariant easy to test in isolation and easy to reason about when something fails.
 
 For the architecture diagram and the agent loop deep-dive, see [`docs/project-overview.md`](docs/project-overview.md) and [`docs/agent-2026-04-28.md`](docs/agent-2026-04-28.md).
 
@@ -107,19 +107,19 @@ The stack splits into four layers; each was chosen so v2 can swap one piece with
 
 Three apps under `apps/`, plus an OpenSpec workflow at the root. Each app has its own Dockerfile and runs independently in `docker-compose.yml`:
 
-- **`apps/api`** — FastAPI backend.
+- **`apps/api`**: FastAPI backend.
 
   Hosts `/agent/ask` (SSE), `/llm/chat`, the agent loop, the citation verifier, the walk planner, and the `python -m app.ingest.cli` ingestion CLI.
 
-- **`apps/web`** — React + Vite + TypeScript SPA.
+- **`apps/web`**: React + Vite + TypeScript SPA.
 
   MapLibre GL is the default map engine; the `MapEngine` interface keeps Google Photorealistic 3D Tiles a swap-in away.
 
-- **`apps/worker`** — heartbeat-only in V1.
+- **`apps/worker`**: heartbeat-only in V1.
 
   Same image as `apps/api`. The topology exists so v2 can drop in a scheduler without rebuilding.
 
-- **`openspec/`** — spec-driven change proposals.
+- **`openspec/`**: spec-driven change proposals.
 
   Active change is `initial-palimpsest-scaffold`; locked V1 decisions live in `swap-llm-tiers-and-lock-mvp-decisions`.
 
@@ -127,7 +127,7 @@ Three apps under `apps/`, plus an OpenSpec workflow at the root. Each app has it
 
 V1 ships the smallest end-to-end system that answers a citation-grounded walking-tour question. V2 widens the data sources and adds deployment surface:
 
-**V1 — shipped:**
+**V1, shipped:**
 
 - Monorepo + docker-compose
 - FastAPI skeleton + two-tier LLM router with circuit breakers
@@ -137,7 +137,7 @@ V1 ships the smallest end-to-end system that answers a citation-grounded walking
 - SSE endpoint, frontend EventSource consumer, map markers + `flyTo`
 - Per-session telemetry harness for cost / cycle-time / failure-mode analysis
 
-**V2 — planned:**
+**V2, planned:**
 
 - On-device LLM endpoint via the same env-driven router tier
 - Live data sources: Chronicling America, NYPL, NYC Open Data, MTA, NOAA
@@ -145,14 +145,14 @@ V1 ships the smallest end-to-end system that answers a citation-grounded walking
 
 ## Further reading
 
-The deep-dives below are dated snapshots — each describes the system as of the date in the filename.
+The deep-dives below are dated snapshots; each describes the system as of the date in the filename.
 
-- [`docs/project-overview.md`](docs/project-overview.md) — full project context, architecture, status snapshot, locked design decisions.
-- [`docs/agent-2026-04-28.md`](docs/agent-2026-04-28.md) — agent loop, citation verifier, SSE endpoint.
-- [`docs/db-and-embeddings-2026-04-28.md`](docs/db-and-embeddings-2026-04-28.md) — schema + ORM + embedder.
-- [`docs/ingestion-2026-04-28.md`](docs/ingestion-2026-04-28.md) — Wikipedia + OSM ingestion.
-- [`docs/swap-llm-tiers-2026-04-28.md`](docs/swap-llm-tiers-2026-04-28.md) — V1 MVP lock-down (LLM router rename, embedding model, citation contract, license).
-- [`openspec/changes/initial-palimpsest-scaffold/`](openspec/changes/initial-palimpsest-scaffold/) — active OpenSpec change.
+- [`docs/project-overview.md`](docs/project-overview.md): full project context, architecture, status snapshot, locked design decisions.
+- [`docs/agent-2026-04-28.md`](docs/agent-2026-04-28.md): agent loop, citation verifier, SSE endpoint.
+- [`docs/db-and-embeddings-2026-04-28.md`](docs/db-and-embeddings-2026-04-28.md): schema + ORM + embedder.
+- [`docs/ingestion-2026-04-28.md`](docs/ingestion-2026-04-28.md): Wikipedia + OSM ingestion.
+- [`docs/swap-llm-tiers-2026-04-28.md`](docs/swap-llm-tiers-2026-04-28.md): V1 MVP lock-down (LLM router rename, embedding model, citation contract, license).
+- [`openspec/changes/initial-palimpsest-scaffold/`](openspec/changes/initial-palimpsest-scaffold/): active OpenSpec change.
 
 ## License
 
