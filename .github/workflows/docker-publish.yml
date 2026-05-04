@@ -92,5 +92,11 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: ${{ matrix.build-args }}
+          # SLSA provenance attestation requires `id-token: write` and adds an
+          # extra post-push step that has been flaky on the larger api image.
+          # We don't need SLSA for v0.1; turn this back on with id-token:write
+          # in workflow permissions when we want signed provenance.
+          provenance: false
+          sbom: false
           cache-from: type=gha,scope=palimpsest-${{ matrix.name }}
           cache-to: type=gha,scope=palimpsest-${{ matrix.name }},mode=max
