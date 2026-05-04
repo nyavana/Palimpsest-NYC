@@ -140,7 +140,7 @@ services:
   # and `make extract`). The file is gitignored — drop it in place before `make up`.
 
   osrm-prepare:
-    image: osrm/osrm-backend:v5.27.1
+    image: osrm/osrm-backend:v5.25.0
     container_name: palimpsest-osrm-prepare
     command:
       - bash
@@ -163,7 +163,7 @@ services:
     restart: "no"
 
   osrm:
-    image: osrm/osrm-backend:v5.27.1
+    image: osrm/osrm-backend:v5.25.0
     container_name: palimpsest-osrm
     command:
       - osrm-routed
