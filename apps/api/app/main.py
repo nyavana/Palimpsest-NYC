@@ -16,6 +16,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app import __version__
 from app.agent.loop import AgentLoop
 from app.agent.tools.base import ToolRegistry
+from app.agent.tools.plan_walk import PlanWalkTool
 from app.agent.tools.search_places import SearchPlacesTool
 from app.config import Settings, get_settings
 from app.db.engine import build_engine, build_session_factory
@@ -98,9 +99,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.routing_backend = OsrmBackend(base_url=settings.osrm_base_url)
     log.info("routing_backend.ready", base_url=settings.osrm_base_url)
 
-    # Agent surface — V1 contract: exactly one tool registered (search_places)
+    # Agent surface — V1 (route-planning amendment): two tools, search_places
+    # and plan_walk. `plan_walk` reads `routing_backend` and `retrieval_ledger`
+    # from its `ToolExecutionContext`. The routing_backend is process-wide and
+    # is wired into the context in apps/api/app/routes/agent.py (Wave 4); the
+    # retrieval_ledger is per-conversation and is attached to the context by
+    # the agent loop before each tool dispatch (Wave 3). This file only
+    # registers the tool — the context plumbing lives where the context is
+    # constructed.
+    # TODO(wave-4): once routes/agent.py builds ToolExecutionContext with
+    #   routing_backend=app.state.routing_backend, this comment can be deleted.
     tool_registry = ToolRegistry()
     tool_registry.register(SearchPlacesTool())
+    tool_registry.register(PlanWalkTool())
     app.state.agent_tool_registry = tool_registry
     app.state.agent_loop_builder = lambda _request: AgentLoop(
         router=app.state.llm_router,

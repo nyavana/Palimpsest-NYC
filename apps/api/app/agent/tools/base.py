@@ -15,11 +15,22 @@ the LLM can recover from on the next turn.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 import jsonschema
 
 from app.llm.models import ToolDefinition
+
+if TYPE_CHECKING:
+    # Forward-only imports to avoid an import cycle:
+    #   app.routing imports nothing from app.agent.tools
+    #   app.agent.citations imports nothing from app.agent.tools
+    # but app.agent.tools.plan_walk DOES import from both, so keeping these
+    # imports under TYPE_CHECKING keeps `app.agent.tools.base` itself a leaf
+    # module that any tool can import without dragging the routing or
+    # citations modules into the import graph at module-load time.
+    from app.agent.citations import RetrievalLedger
+    from app.routing import RoutingBackend
 
 
 class ToolArgError(ValueError):
@@ -48,13 +59,26 @@ class _SessionLike(Protocol):
 class ToolExecutionContext:
     """Per-call context passed to `Tool.execute`.
 
-    Holds whatever ambient state a tool needs (DB session, embedder) without
-    forcing every tool to declare it. Tests can build a default context with
-    no kwargs and inject only what the tool under test consumes.
+    Holds whatever ambient state a tool needs (DB session, embedder, routing
+    backend, retrieval ledger) without forcing every tool to declare it.
+    Tests can build a default context with no kwargs and inject only what
+    the tool under test consumes.
+
+    Fields:
+      - `session`: async DB session (used by both tools).
+      - `embedder`: sentence-transformer singleton (used by `search_places`).
+      - `routing_backend`: routing client (used by `plan_walk`; `None` means
+        the tool MUST fail loudly rather than silently degrade).
+      - `retrieval_ledger`: per-conversation `RetrievalLedger` (used by
+        `plan_walk` to validate that every `place_id` it's asked to route
+        through was actually returned by a prior `search_places` call).
+      - `metadata`: free-form bag for ad-hoc per-call data.
     """
 
     session: _SessionLike | None = None
     embedder: Any = None
+    routing_backend: RoutingBackend | None = None
+    retrieval_ledger: RetrievalLedger | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
