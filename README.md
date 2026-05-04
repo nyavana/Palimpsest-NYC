@@ -23,42 +23,133 @@ The four properties below are enforced in code, not aspirational:
 
 ## Quickstart
 
-Prereqs: Docker (with `compose` v2). You will need an `OPENROUTER_API_KEY`.
+This runs the full project on your machine using the prebuilt Docker images. Nothing on your host except Docker itself.
 
-Three images are published to ghcr.io and pulled by `docker-compose.prod.yml`. No Python or Node toolchain on the host, no local build step.
+Docker bundles each service and its dependencies into an image. The compose file in this repo describes five such services (postgres, redis, api, worker, web) and the network they share, and brings them all up with one command.
+
+### Prerequisites
+
+- **Docker** with the `compose` v2 plugin. On macOS or Windows, install [Docker Desktop](https://www.docker.com/products/docker-desktop/). On Linux, install [Docker Engine](https://docs.docker.com/engine/install/) and confirm `docker compose version` works.
+- **An OpenRouter API key** from [openrouter.ai/keys](https://openrouter.ai/keys). The default models the project uses are on the free tier.
+- About **2 GB of free disk** for the images and the corpus.
+
+### 1. Get the deployment files
+
+You need the repo's `docker-compose.prod.yml` and `.env.example`. Cloning is the simplest way:
 
 ```bash
-# 1. configure environment
-cp .env.example .env
-# edit .env to set OPENROUTER_API_KEY
-
-# 2. pull and start
-docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d
-
-# 3. health check
-curl http://localhost:8000/health
-# → {"status":"ok"}
-
-# 4. open the frontend
-open http://localhost:5173
+git clone https://github.com/nyavana/Palimpsest-NYC.git
+cd Palimpsest-NYC
 ```
 
-The corpus is empty until you run the ingestion CLIs once — see [Try the agent](#try-the-agent) below.
+If you'd rather not clone, download just those two files from the repo into a fresh directory.
 
-To stop the stack while keeping the corpus and embeddings cache:
+### 2. Set your API key
+
+```bash
+cp .env.example .env
+# open .env in any editor and set OPENROUTER_API_KEY=sk-or-v1-...
+```
+
+`.env` stays on your machine; it never enters the Docker images. On a shared host, run `chmod 600 .env` so only your user can read it.
+
+### 3. Pull the images
+
+```bash
+docker compose -f docker-compose.prod.yml pull
+```
+
+This downloads three Palimpsest images (`api`, `web`, `postgres`) from `ghcr.io/nyavana/palimpsest-*` plus the public `redis:7-alpine` image. About 1 GB total. The first pull takes a couple of minutes; later pulls only fetch the layers that changed.
+
+### 4. Start everything
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+`-d` runs the stack detached (in the background). Compose starts services in dependency order: postgres and redis become healthy first, then api and worker, then web. The first start downloads the `BAAI/bge-small-en-v1.5` embedding model (~130 MB) into a named volume, which adds about a minute one time.
+
+### 5. Verify it's up
+
+```bash
+docker compose -f docker-compose.prod.yml ps
+```
+
+Every service should report `Up` and `(healthy)`. Then:
+
+```bash
+curl http://localhost:8000/health
+# {"status":"ok","version":"0.1.0"}
+```
+
+Open [http://localhost:5173](http://localhost:5173) in a browser. The UI loads, but the agent has nothing to talk about until you populate the corpus.
+
+### 6. Populate the corpus (one-time, ~30 seconds)
+
+```bash
+docker compose -f docker-compose.prod.yml exec api python -m app.ingest.cli osm run
+docker compose -f docker-compose.prod.yml exec api python -m app.ingest.cli wikipedia run
+```
+
+`docker compose ... exec api ...` runs a command inside the already-running api container. Both ingestors are idempotent — re-running them won't create duplicates. After this you should have 928 places and 323 documents in postgres, all embedded.
+
+You're done. Ask the agent something through the web UI, or skip ahead to [Try the agent](#try-the-agent) for a `curl` example and the SSE event format.
+
+## Day-to-day operations
+
+All commands run from the repo root with the same `-f docker-compose.prod.yml` flag.
+
+**Tail logs.** Live, last 100 lines, all services:
+
+```bash
+docker compose -f docker-compose.prod.yml logs -f --tail 100
+```
+
+For a single service add the name: `... logs -f api`.
+
+**Stop without losing data.**
 
 ```bash
 docker compose -f docker-compose.prod.yml down
 ```
 
-To wipe the volumes too (drops the corpus, requires a fresh ingest on next start):
+The corpus, embeddings cache, and redis state live in named volumes (`palimpsest-postgres-data`, `palimpsest-hf-cache`, `palimpsest-redis-data`). Bring everything back with `up -d`.
+
+**Update to a newer release.**
+
+```bash
+git pull
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+`up -d` recreates only the containers whose images changed.
+
+**Pin a specific version.** The default tag is `latest` (tracks `main`). For a deployment you want to be reproducible, pin to a semver tag:
+
+```bash
+PALIMPSEST_TAG=v0.1.0 docker compose -f docker-compose.prod.yml pull
+PALIMPSEST_TAG=v0.1.0 docker compose -f docker-compose.prod.yml up -d
+```
+
+Tag the variable in your shell or `.env` so every command picks it up.
+
+**Open a shell inside a container.**
+
+```bash
+docker compose -f docker-compose.prod.yml exec api bash
+docker compose -f docker-compose.prod.yml exec postgres psql -U palimpsest -d palimpsest
+```
+
+**Wipe everything (drops the corpus too).**
 
 ```bash
 docker compose -f docker-compose.prod.yml down -v
 ```
 
-The published images:
+You will need to re-run the ingestion CLIs after this.
+
+## What's in the published images
 
 | Image | Purpose |
 |---|---|
@@ -66,14 +157,9 @@ The published images:
 | `ghcr.io/nyavana/palimpsest-web` | React SPA built into nginx. Routes `/api/*` to the api service over the compose network. |
 | `ghcr.io/nyavana/palimpsest-postgres` | PostGIS 16 + pgvector + pg_trgm, with the V1 migrations baked into `/docker-entrypoint-initdb.d`. |
 
-The `latest` tag tracks `main`; semver tags (`v0.1.0`, `0.1`) come from git tags. Pin a release with `PALIMPSEST_TAG`:
+Tags: `latest` tracks `main`; semver tags (`v0.1.0`, `0.1`) come from git tags. The api image is around 760 MB uncompressed — `torch` is pulled from the CPU-only PyTorch index, so none of the CUDA payload is along for the ride.
 
-```bash
-PALIMPSEST_TAG=v0.1.0 docker compose -f docker-compose.prod.yml pull
-PALIMPSEST_TAG=v0.1.0 docker compose -f docker-compose.prod.yml up -d
-```
-
-The api image is around 760 MB uncompressed — `torch` is pulled from the CPU-only PyTorch index, so none of the CUDA payload is along for the ride.
+The OpenRouter key is read from your host's `.env` at container start; it never enters the image. The published images have been audited for `.env` files and OpenRouter key signatures and are clean.
 
 ## Build from source
 
@@ -91,22 +177,13 @@ Stop with `make down`, or `make nuke` to drop the volumes too. Schema changes re
 
 ## Try the agent
 
-Once the stack is up, populate the corpus once and ask the agent a walking-tour question. Pick the `exec` command that matches how you started the stack:
+With the stack up and the corpus populated (Quickstart step 6), ask the agent a walking-tour question over SSE:
 
 ```bash
-# 1. populate the 5km² Morningside Heights + UWS corpus (~30s total)
-# published images:
-docker compose -f docker-compose.prod.yml exec api python -m app.ingest.cli osm run
-docker compose -f docker-compose.prod.yml exec api python -m app.ingest.cli wikipedia run
-# or, if you built from source:
-docker compose exec api python -m app.ingest.cli osm run
-docker compose exec api python -m app.ingest.cli wikipedia run
-
-# 2. ask the agent a question; watch SSE events stream live
 curl -N "http://localhost:8000/agent/ask?q=Tell+me+about+a+gothic+cathedral+in+Morningside+Heights"
 ```
 
-Re-running ingestion is idempotent; rows are upserted by their stable provenance keys.
+If you built from source, the same URL works (the dev compose exposes the api on port 8000 too).
 
 The SSE stream emits the following frames in order:
 
