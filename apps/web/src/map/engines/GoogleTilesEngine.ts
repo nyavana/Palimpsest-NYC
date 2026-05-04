@@ -67,6 +67,28 @@ export class GoogleTilesEngine implements MapEngine {
     );
   }
 
+  onMarkerHover(_cb: (e: import("../types").MarkerEvent | null) => void): import("../types").Unsubscribe {
+    throw new NotImplementedError(
+      `GoogleTilesEngine.onMarkerHover is not implemented. ${UPGRADE_DOC_HINT}`,
+    );
+  }
+
+  onMarkerClick(_cb: (e: import("../types").MarkerEvent) => void): import("../types").Unsubscribe {
+    throw new NotImplementedError(
+      `GoogleTilesEngine.onMarkerClick is not implemented. ${UPGRADE_DOC_HINT}`,
+    );
+  }
+
+  setPopup(_at: LatLng, _el: HTMLElement, _opts?: { offsetPx?: number }): void {
+    throw new NotImplementedError(
+      `GoogleTilesEngine.setPopup is not implemented. ${UPGRADE_DOC_HINT}`,
+    );
+  }
+
+  clearPopup(): void {
+    // Safe no-op for parity with destroy().
+  }
+
   destroy(): void {
     // Safe no-op so consumer cleanup paths don't throw in dev.
   }
