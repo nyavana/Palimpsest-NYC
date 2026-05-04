@@ -102,7 +102,9 @@ Request flow: `RequestIdMiddleware` binds an `X-Request-ID` to structlog context
 
 ### `apps/web` — React + Vite + TS + MapLibre
 
-`apps/web/src/components/MapView.tsx` consumes a `MapEngine` interface so the concrete engine (MapLibre today, Google Photorealistic 3D Tiles later) is selected from `VITE_MAP_ENGINE` and swappable in a single factory file. Tailwind, ESLint, Prettier preconfigured. Dockerfile builds a static bundle behind nginx (port 80 in container, 5173 on the host).
+`apps/web/src/components/MapView.tsx` consumes a `MapEngine` interface so the concrete engine (MapLibre today, Google Photorealistic 3D Tiles later) is selected from `VITE_MAP_ENGINE` and swappable in a single factory file (`src/map/`). Tailwind, ESLint, Prettier preconfigured. Dockerfile builds a static bundle behind nginx (port 80 in container, 5173 on the host).
+
+The SSE consumer lives in `src/state/sse.ts` and `src/state/useAgentSession.ts`; UI surfaces are split into `ChatPane`, `Composer`, `NarrationStream`, `CitationList` / `CitationCard`, `WalkTimeline`, and `WarningBanner`. The map and chat panes share state via `MapEngineContext`, and citations drive `flyTo` as they arrive on the wire — there is no client-side route planning, the SSE `walk` frame is authoritative.
 
 ### `apps/worker` — minimal heartbeat (V1)
 
@@ -120,4 +122,6 @@ Same image as the api (`apps/api/Dockerfile`). `worker.main` runs a heartbeat lo
 
 ## Status quick-reference
 
-Backend MVP is shipped (FastAPI skeleton, LLM router, DB+embeddings, ingestion, agent + walk planner + SSE). Frontend rendering, eval, and final report are the open phases. Treat anything in `openspec/changes/initial-palimpsest-scaffold/tasks.md` marked open as the live to-do list.
+V1 has shipped (commit `e1bc76d`): FastAPI skeleton, two-tier LLM router, DB + 384-dim embeddings, Wikipedia + OSM ingestion, single-tool agent loop, citation verifier, server-side walk planner, SSE endpoint, React frontend with EventSource consumer + map markers + `flyTo`, and the per-session telemetry harness. Open phases are evaluation runs and the final report — anything in `openspec/changes/initial-palimpsest-scaffold/tasks.md` marked open is the live to-do list. V2 work (on-device LLM endpoint, additional live data sources, VPS deploy + scheduler in `apps/worker`) is deferred.
+
+For the architecture diagram and dated deep-dives, see `docs/project-overview.md` and the dated phase notes (`docs/agent-2026-04-28.md`, `docs/db-and-embeddings-2026-04-28.md`, `docs/ingestion-2026-04-28.md`, `docs/swap-llm-tiers-2026-04-28.md`).
