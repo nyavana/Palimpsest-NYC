@@ -25,6 +25,7 @@ from app.llm.router import build_llm_router
 from app.llm.telemetry import TelemetrySink
 from app.logging import configure_logging, get_logger
 from app.routes import agent, health, llm, meta
+from app.routing import OsrmBackend
 
 log = get_logger(__name__)
 
@@ -90,6 +91,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     log.info("embedder.loading", model=settings.embeddings.model)
     app.state.embedder = build_embedder(settings.embeddings)
     log.info("embedder.ready", dim=app.state.embedder.dim)
+
+    # Routing backend (V1 = OSRM in-cluster). The backend opens a fresh
+    # httpx.AsyncClient per `route()` call so there is no connection pool
+    # to dispose on shutdown.
+    app.state.routing_backend = OsrmBackend(base_url=settings.osrm_base_url)
+    log.info("routing_backend.ready", base_url=settings.osrm_base_url)
 
     # Agent surface — V1 contract: exactly one tool registered (search_places)
     tool_registry = ToolRegistry()
