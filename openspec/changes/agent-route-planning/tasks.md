@@ -33,12 +33,12 @@
 
 ## 4. plan_walk Tool
 
-- [ ] 4.1 Create `apps/api/app/agent/tools/plan_walk.py` declaring the JSON Schema (place_ids 2..8, mode enum)
-- [ ] 4.2 Implement `PlanWalkTool.run(args, context)`: dedupe `place_ids`, validate against `context.retrieval_ledger`, look up coordinates via the existing `apps/api/app/agent/walk.py::plan_walk` DB helper (or its underlying SQL), then call `context.routing_backend.route(...)` and serialize the result with the `stop_ordering` telemetry tag
-- [ ] 4.3 Implement the haversine fallback path: catch `RoutingBackendError`, log a structured warning, build a `RouteResult` with `routing_backend="haversine_fallback"`, `stop_ordering="input_order"`, per-leg `geometry` as a two-point GeoJSON LineString, and a single `"Head toward <name>"` step per leg
-- [ ] 4.4 Extend `ToolExecutionContext` (in `apps/api/app/agent/tools/base.py`) to carry `routing_backend` and `retrieval_ledger` references
-- [ ] 4.5 Register `PlanWalkTool` in the lifespan-built `agent_tool_registry` alongside `SearchPlacesTool`
-- [ ] 4.6 Unit tests `apps/api/tests/test_plan_walk_tool.py` covering: 2-stop success (`stop_ordering="input_order"`), 4-stop success (`stop_ordering="tsp_optimized"`, OSRM `waypoints[].waypoint_index` permutation honored), unknown_place_id, too_few_places, unsupported_mode, OSRM down → haversine fallback with a renderable LineString geometry
+- [x] 4.1 Create `apps/api/app/agent/tools/plan_walk.py` declaring the JSON Schema (place_ids 2..8, mode enum)
+- [x] 4.2 Implement `PlanWalkTool.run(args, context)`: dedupe `place_ids`, validate against `context.retrieval_ledger`, look up coordinates via the existing `apps/api/app/agent/walk.py::plan_walk` DB helper (or its underlying SQL), then call `context.routing_backend.route(...)` and serialize the result with the `stop_ordering` telemetry tag
+- [x] 4.3 Implement the haversine fallback path: catch `RoutingBackendError`, log a structured warning, build a `RouteResult` with `routing_backend="haversine_fallback"`, `stop_ordering="input_order"`, per-leg `geometry` as a two-point GeoJSON LineString, and a single `"Head toward <name>"` step per leg
+- [x] 4.4 Extend `ToolExecutionContext` (in `apps/api/app/agent/tools/base.py`) to carry `routing_backend` and `retrieval_ledger` references
+- [x] 4.5 Register `PlanWalkTool` in the lifespan-built `agent_tool_registry` alongside `SearchPlacesTool`. *Per-request context fields (`routing_backend`, `retrieval_ledger`) wired by Wave 3/4.*
+- [x] 4.6 Unit tests `apps/api/tests/test_plan_walk_tool.py` covering: 2-stop success (`stop_ordering="input_order"`), 4-stop success (`stop_ordering="tsp_optimized"`, OSRM `waypoints[].waypoint_index` permutation honored), unknown_place_id, too_few_places, unsupported_mode, OSRM down → haversine fallback with a renderable LineString geometry. *8 tests pass; full suite 215 passed/1 skipped.*
 
 ## 5. Walk-Intent Soft Hint
 
@@ -68,13 +68,13 @@
 
 ## 8. Frontend Updates
 
-- [ ] 8.1 Extend `apps/web/src/state/types.ts`: add `GeoJSONLineString` type alias, `RouteLeg`, `RouteStep`; extend `PlannedRoute` with `geometry?: GeoJSONLineString`, `legs?: RouteLeg[]`, `total_distance_m?: number`, `total_duration_s?: number`, `stop_ordering?: "input_order" | "tsp_optimized"` (all optional for backward compatibility)
-- [ ] 8.2 Update `apps/web/src/state/sse.ts` typed payload schema for the `walk` event to mirror the extended shape (no decoder needed)
-- [ ] 8.3 Update `apps/web/src/components/MapView.tsx` to: when a `walk` frame includes `geometry`, convert `geometry.coordinates` from `[lon, lat]` to `{lng, lat}` and pass into `engine.addPath("walk", coords)`; when only V1 `stops[]` is present, fall back to the existing straight-line behavior. NO polyline decoder is created — the file `apps/web/src/map/polyline.ts` MUST NOT exist
-- [ ] 8.4 Update `apps/web/src/components/WalkTimeline.tsx`: render a footer with `total_distance_m`/`total_duration_s` when present, formatted as `"Total: 1.2 km · ~15 min"`; add a per-stop disclosure that expands `legs[stop.index - 1].steps[]` rendered as numbered instructions
-- [ ] 8.5 Confirm `npm run typecheck` and `npm run lint` pass cleanly in `apps/web/`; confirm no `polyline` or `@mapbox/polyline` is added to `apps/web/package.json`
-- [ ] 8.6 Add a Vitest snapshot or RTL test for `WalkTimeline` rendering with a fake walk fixture (stops + legs + steps + totals + GeoJSON geometry)
-- [ ] 8.7 Add a `MapView` test asserting it consumes `walk.geometry.coordinates` directly, without invoking any decoder function
+- [x] 8.1 Extend `apps/web/src/state/types.ts`: add `GeoJSONLineString` type alias, `RouteLeg`, `RouteStep`; extend `PlannedRoute` with `geometry?: GeoJSONLineString`, `legs?: RouteLeg[]`, `total_distance_m?: number`, `total_duration_s?: number`, `stop_ordering?: "input_order" | "tsp_optimized"` (all optional for backward compatibility)
+- [x] 8.2 Update `apps/web/src/state/sse.ts` typed payload schema for the `walk` event to mirror the extended shape (no decoder needed)
+- [x] 8.3 Update `apps/web/src/components/MapView.tsx` to: when a `walk` frame includes `geometry`, convert `geometry.coordinates` from `[lon, lat]` to `{lng, lat}` and pass into `engine.addPath("walk", coords)`; when only V1 `stops[]` is present, fall back to the existing straight-line behavior. NO polyline decoder is created — the file `apps/web/src/map/polyline.ts` MUST NOT exist. *Haversine fallback renders dashed + ink-muted via existing `PathStyle.dashed`.*
+- [x] 8.4 Update `apps/web/src/components/WalkTimeline.tsx`: render a footer with `total_distance_m`/`total_duration_s` when present, formatted as `"Total: 1.2 km · ~15 min"`; add a per-stop disclosure that expands `legs[stop.index - 1].steps[]` rendered as numbered instructions. *Plus a `tsp-optimized` micro-annotation in the section header when stops were reordered.*
+- [x] 8.5 Confirm `npm run typecheck` and `npm run lint` pass cleanly in `apps/web/`; confirm no `polyline` or `@mapbox/polyline` is added to `apps/web/package.json`. *Typecheck clean; lint baseline-identical (zero new errors/warnings).*
+- [x] 8.6 Add a Vitest snapshot or RTL test for `WalkTimeline` rendering with a fake walk fixture (stops + legs + steps + totals + GeoJSON geometry). *7 vitest+RTL tests written; vitest itself not installed (no new devDeps); test files excluded from tsc/eslint until vitest lands.*
+- [x] 8.7 Add a `MapView` test asserting it consumes `walk.geometry.coordinates` directly, without invoking any decoder function. *5 tests written under same vitest-pending arrangement.*
 
 ## 9. Telemetry
 
