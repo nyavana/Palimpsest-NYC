@@ -1,0 +1,18 @@
+Drop the real extract.osm.pbf file in this directory before running `make up`.
+
+The real file is a binary OSM PBF extract for the V1 bounding box:
+  west=-74.000, south=40.795, east=-73.955, north=40.825
+  (Morningside Heights + Upper West Side, Manhattan)
+
+Expected size: ~3-8 MB
+
+How to obtain:
+  Option A (BBBike, precise bbox):
+    Run:  make extract
+    This prints the BBBike URL and the curl command to download the file.
+
+  Option B (Geofabrik + osmium clip):
+    curl -L https://download.geofabrik.de/north-america/us/new-york-latest.osm.pbf -o new-york-latest.osm.pbf
+    osmium extract --bbox -74.000,40.795,-73.955,40.825 new-york-latest.osm.pbf -o infra/osrm/extract.osm.pbf
+
+See infra/osrm/README.md for full instructions.
