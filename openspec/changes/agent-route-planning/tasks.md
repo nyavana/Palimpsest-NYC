@@ -54,17 +54,17 @@
 - [x] 6.2 Extend the `_SYSTEM_PROMPT` with the "when to call plan_walk" rubric described in design §7 (preserve all existing rules verbatim)
 - [x] 6.3 Add `walk: PlannedRoute | None` and `walk_intent_hint: Literal["positive", "negative", "neutral"]` to `AgentResult`; defaults `None` and `"neutral"`. *PlannedRoute aliased to `dict[str, Any]` for V1.*
 - [x] 6.4 Capture the latest successful `plan_walk` tool result into `AgentResult.walk`; replace on each successful call (most recent wins)
-- [ ] 6.5 Pass `routing_backend` from `app.state` into `ToolExecutionContext` at the SSE handler entry point *(deferred to Wave 4)*
+- [x] 6.5 Pass `routing_backend` from `app.state` into `ToolExecutionContext` at the SSE handler entry point
 - [x] 6.6 Append the §5.4 INTENT_NOTE line to the system prompt at loop construction time (not at every turn) and store the label on `AgentResult`. *Run-time templating in `run_streamed`; the prompt module-level constant stays untouched.*
 - [x] 6.7 Update or add tests in `apps/api/tests/test_agent_loop.py` covering: (a) tour-style query (`positive` hint) → `plan_walk` is called, AgentResult.walk is populated; (b) informational query (`negative` hint) → `plan_walk` is not called, AgentResult.walk is `None`; (c) ambiguous (`neutral`) query → both behaviors valid; (d) two `plan_walk` calls → only the second is retained on AgentResult.walk. *8 new tests; full suite 223 passed/1 skipped.*
 
 ## 7. SSE Handler Update
 
-- [ ] 7.1 In `apps/api/app/routes/agent.py`, remove the unconditional `plan_walk(session=..., place_ids=[c.doc_id ...])` call after the loop completes
-- [ ] 7.2 Replace it with: emit the `walk` frame ONLY if `terminal_result.walk is not None`, serializing the `PlannedRoute` dataclass (with `legs[].steps[]`, `legs[].geometry`, full-route `geometry`, totals, `stop_ordering`)
-- [ ] 7.3 Preserve the V1 `walk` frame's `stops[]` shape (additive change only); keep the same SSE event name
-- [ ] 7.4 Update `_serialize_event` to handle the new `AgentResult.walk` field if needed; ensure GeoJSON `geometry` dicts serialize as plain JSON objects, not wrapped in dataclass shells
-- [ ] 7.5 Curl smoke per the spec: tour-style query produces a `walk` frame; informational query does not
+- [x] 7.1 In `apps/api/app/routes/agent.py`, remove the unconditional `plan_walk(session=..., place_ids=[c.doc_id ...])` call after the loop completes
+- [x] 7.2 Replace it with: emit the `walk` frame ONLY if `terminal_result.walk is not None`, serializing the `PlannedRoute` dataclass (with `legs[].steps[]`, `legs[].geometry`, full-route `geometry`, totals, `stop_ordering`). *Framed directly with `_frame("walk", terminal_result.walk)` so GeoJSON dicts pass through as plain JSON objects.*
+- [x] 7.3 Preserve the V1 `walk` frame's `stops[]` shape (additive change only); keep the same SSE event name
+- [x] 7.4 Update `_serialize_event` to handle the new `AgentResult.walk` field if needed; ensure GeoJSON `geometry` dicts serialize as plain JSON objects, not wrapped in dataclass shells. *Walk frame bypasses `_serialize_event` (it operates on `AgentEvent`s); GeoJSON dicts hit `json.dumps` directly.*
+- [ ] 7.5 Curl smoke per the spec: tour-style query produces a `walk` frame; informational query does not *(deferred to Wave 5)*
 
 ## 8. Frontend Updates
 
@@ -78,9 +78,9 @@
 
 ## 9. Telemetry
 
-- [ ] 9.1 Extend `SessionRecord` (in `apps/api/app/meta/`) with optional `plan_walk_called: bool`, `routing_backend: str | None`, `stop_ordering: str | None`, `walk_intent_hint: str` (defaults `"neutral"`)
-- [ ] 9.2 Populate the new fields from `AgentResult` (`plan_walk_called = result.walk is not None`; `routing_backend = result.walk.routing_backend if result.walk else None`; `stop_ordering = result.walk.stop_ordering if result.walk else None`; `walk_intent_hint = result.walk_intent_hint`)
-- [ ] 9.3 Update the §13.4 hand-grading checklist (in `docs/`) with two columns: "walk decision appropriate" and "hint correct" so over/under-call rates can be tracked separately by hint label
+- [x] 9.1 Extend `SessionRecord` (in `apps/api/app/meta/`) with optional `plan_walk_called: bool`, `routing_backend: str | None`, `stop_ordering: str | None`, `walk_intent_hint: str` (defaults `"neutral"`)
+- [x] 9.2 Populate the new fields from `AgentResult` (`plan_walk_called = result.walk is not None`; `routing_backend = result.walk.routing_backend if result.walk else None`; `stop_ordering = result.walk.stop_ordering if result.walk else None`; `walk_intent_hint = result.walk_intent_hint`). *New `_record_session` hook in routes/agent.py; failures swallowed so telemetry never breaks SSE.*
+- [x] 9.3 Update the §13.4 hand-grading checklist (in `docs/`) with two columns: "walk decision appropriate" and "hint correct" so over/under-call rates can be tracked separately by hint label. *Created `docs/walk-eval-checklist.md` (existing v1-eval-report.md is a finalized post-hoc report, not a reusable rubric).*
 
 ## 10. End-to-End Validation
 
