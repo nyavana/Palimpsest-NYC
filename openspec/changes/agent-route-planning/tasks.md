@@ -10,26 +10,26 @@
 
 ## 2. Routing Backend Infrastructure (Docker + OSM extract)
 
-- [ ] 2.1 Create `infra/osrm/` directory with a `README.md` describing how to refresh the OSM extract from BBBike or Geofabrik for the V1 bbox (`-74.000, 40.795, -73.955, 40.825`)
-- [ ] 2.2 Add `infra/osrm/extract.osm.pbf` to the repo (or document the download path if it exceeds the 50 MB threshold and gitignore it)
-- [ ] 2.3 Add an `osrm-prepare` one-shot service to `docker-compose.yml` running `osrm-extract -p /opt/foot.lua && osrm-partition && osrm-customize`, idempotent on volume mtime
-- [ ] 2.4 Add a runtime `osrm` service to `docker-compose.yml` running `osrm-routed --algorithm mld /data/extract.osrm` on port 5000
-- [ ] 2.5 Add a named docker volume `osrm-data` shared read-write between `osrm-prepare` and read-only into `osrm`
-- [ ] 2.6 Update `Makefile` if needed so `make up` brings the routing services healthy alongside postgres/redis/api/web
-- [ ] 2.7 Smoke: `curl http://localhost:5000/route/v1/foot/-73.962,40.804;-73.964,40.811?overview=full&steps=true` returns `code=Ok`
+- [x] 2.1 Create `infra/osrm/` directory with a `README.md` describing how to refresh the OSM extract from BBBike or Geofabrik for the V1 bbox (`-74.000, 40.795, -73.955, 40.825`)
+- [x] 2.2 Add `infra/osrm/extract.osm.pbf` to the repo (or document the download path if it exceeds the 50 MB threshold and gitignore it). *Gitignored; placeholder + `make extract` documented.*
+- [x] 2.3 Add an `osrm-prepare` one-shot service to `docker-compose.yml` running `osrm-extract -p /opt/foot.lua && osrm-partition && osrm-customize`, idempotent on volume mtime
+- [x] 2.4 Add a runtime `osrm` service to `docker-compose.yml` running `osrm-routed --algorithm mld /data/extract.osrm` on port 5000
+- [x] 2.5 Add a named docker volume `osrm-data` shared read-write between `osrm-prepare` and read-only into `osrm`
+- [x] 2.6 Update `Makefile` if needed so `make up` brings the routing services healthy alongside postgres/redis/api/web. *No service-list filter; `make extract` target added for OSM extract download.*
+- [ ] 2.7 Smoke: `curl http://localhost:5000/route/v1/foot/-73.962,40.804;-73.964,40.811?overview=full&steps=true` returns `code=Ok` *(deferred to Wave 5; needs the bbox extract dropped in place + container running)*
 
 ## 3. Routing Module (apps/api/app/routing)
 
-- [ ] 3.1 Create `apps/api/app/routing/__init__.py` exporting `RoutingBackend`, `OsrmBackend`, `RouteResult`, `Leg`, `Step`, `RoutingBackendError`, `GeoJSONLineString`
-- [ ] 3.2 Create `apps/api/app/routing/types.py` with `Coordinate`, `GeoJSONLineString` (TypedDict), `Step`, `Leg`, `RouteResult` dataclasses (slots, frozen where applicable). `RouteResult` carries `geometry: GeoJSONLineString`, `routing_backend`, and `stop_ordering`
-- [ ] 3.3 Create `apps/api/app/routing/steps.py` with `format_step(maneuver, name, distance_m) -> str` per the closed phrase set in the spec; unit tests cover depart/continue/turn/arrive and the <5 m drop rule
-- [ ] 3.4 Create `apps/api/app/routing/osrm.py` with `OsrmBackend(base_url, timeout=10.0)` and `route(stops, mode="walking") -> RouteResult`. Branch on `len(stops)`:
+- [x] 3.1 Create `apps/api/app/routing/__init__.py` exporting `RoutingBackend`, `OsrmBackend`, `RouteResult`, `Leg`, `Step`, `RoutingBackendError`, `GeoJSONLineString`
+- [x] 3.2 Create `apps/api/app/routing/types.py` with `Coordinate`, `GeoJSONLineString` (TypedDict), `Step`, `Leg`, `RouteResult` dataclasses (slots, frozen where applicable). `RouteResult` carries `geometry: GeoJSONLineString`, `routing_backend`, and `stop_ordering`
+- [x] 3.3 Create `apps/api/app/routing/steps.py` with `format_step(maneuver, name, distance_m) -> str` per the closed phrase set in the spec; unit tests cover depart/continue/turn/arrive and the <5 m drop rule
+- [x] 3.4 Create `apps/api/app/routing/osrm.py` with `OsrmBackend(base_url, timeout=10.0)` and `route(stops, mode="walking") -> RouteResult`. Branch on `len(stops)`:
   - 2 stops → GET `/route/v1/foot/...?steps=true&overview=full&geometries=geojson&annotations=duration,distance&radiuses=50;...` → set `stop_ordering="input_order"`
   - 3-8 stops → GET `/trip/v1/foot/...?steps=true&overview=full&geometries=geojson&source=first&destination=last&roundtrip=false&radiuses=50;...` → set `stop_ordering="tsp_optimized"`, reorder `legs[]` by `waypoints[].waypoint_index`
-- [ ] 3.5 Forward OSRM's GeoJSON `geometry` objects untouched into `RouteResult.geometry`, `Leg.geometry`, and `Step.geometry`. Do NOT add a polyline codec — there is no `polyline.py`
-- [ ] 3.6 Add `OSRM_BASE_URL` to `apps/api/app/config.py::Settings` (default `http://osrm:5000`)
-- [ ] 3.7 Wire the routing backend into `app.state.routing_backend` in `apps/api/app/main.py::lifespan`
-- [ ] 3.8 Unit tests `apps/api/tests/test_routing_steps.py`, `test_routing_osrm.py` (httpx mock for OSRM, separate fixtures for `/route` 2-stop and `/trip` 4-stop with `waypoints[].waypoint_index` permutation)
+- [x] 3.5 Forward OSRM's GeoJSON `geometry` objects untouched into `RouteResult.geometry`, `Leg.geometry`, and `Step.geometry`. Do NOT add a polyline codec — there is no `polyline.py`
+- [x] 3.6 Add `OSRM_BASE_URL` to `apps/api/app/config.py::Settings` (default `http://osrm:5000`)
+- [x] 3.7 Wire the routing backend into `app.state.routing_backend` in `apps/api/app/main.py::lifespan`
+- [x] 3.8 Unit tests `apps/api/tests/test_routing_steps.py`, `test_routing_osrm.py` (httpx mock for OSRM, separate fixtures for `/route` 2-stop and `/trip` 4-stop with `waypoints[].waypoint_index` permutation). *33 tests pass; full suite 207 passed/1 skipped.*
 
 ## 4. plan_walk Tool
 
@@ -42,9 +42,9 @@
 
 ## 5. Walk-Intent Soft Hint
 
-- [ ] 5.1 Create `apps/api/app/agent/intent.py` with `classify_walk_intent(query: str) -> Literal["positive", "negative", "neutral"]` implementing the regex/keyword rules in the agent-tools spec
-- [ ] 5.2 Curate a fixture set of ~30 hand-labeled queries (~10 each label) at `apps/api/tests/fixtures/walk_intent_queries.json`
-- [ ] 5.3 Unit test `apps/api/tests/test_walk_intent.py` asserting the classifier matches the labeled fixtures
+- [x] 5.1 Create `apps/api/app/agent/intent.py` with `classify_walk_intent(query: str) -> Literal["positive", "negative", "neutral"]` implementing the regex/keyword rules in the agent-tools spec
+- [x] 5.2 Curate a fixture set of ~30 hand-labeled queries (~10 each label) at `apps/api/tests/fixtures/walk_intent_queries.json` *(10/10/10)*
+- [x] 5.3 Unit test `apps/api/tests/test_walk_intent.py` asserting the classifier matches the labeled fixtures *(54 tests pass)*
 - [ ] 5.4 Update the agent loop builder so the system prompt is templated from `_SYSTEM_PROMPT + INTENT_NOTE[label]`. The `neutral` label appends nothing
 - [ ] 5.5 Capture `walk_intent_hint: str` on `AgentResult` so the SSE handler / telemetry can record it without re-classifying
 
@@ -94,12 +94,12 @@
 
 ## 11. Cross-Link to initial-palimpsest-scaffold (V1 corrections)
 
-- [ ] 11.1 Edit `initial-palimpsest-scaffold/tasks.md` §12.1 to reference the LLM-callable `plan_walk` tool and the routing backend (replacing "server-side post-processing" wording from the prior change)
-- [ ] 11.2 Edit `initial-palimpsest-scaffold/tasks.md` §12.5 to confirm frontend renders GeoJSON LineString + steps (was "list from server-side §4.4.1")
-- [ ] 11.3 Note the turn cap raise (6 → 7) in `initial-palimpsest-scaffold/tasks.md` §9.8
+- [x] 11.1 Edit `initial-palimpsest-scaffold/tasks.md` §12.1 to reference the LLM-callable `plan_walk` tool and the routing backend (replacing "server-side post-processing" wording from the prior change)
+- [x] 11.2 Edit `initial-palimpsest-scaffold/tasks.md` §12.5 to confirm frontend renders GeoJSON LineString + steps (was "list from server-side §4.4.1")
+- [x] 11.3 Note the turn cap raise (6 → 7) in `initial-palimpsest-scaffold/tasks.md` §9.8
 
 ## 12. Documentation
 
 - [ ] 12.1 Add a section to root `README.md` describing the new `osrm` and `osrm-prepare` services and the one-time bbox extract step
-- [ ] 12.2 Update `CLAUDE.md` if any of its locked V1 invariants need amendment: specifically (a) "single-tool surface" → "two tools (search_places, plan_walk)", (b) "Hard turn cap of 6" → "7", (c) "additionally runs server-side `plan_walk` over cited `place_ids` after `done`" → "if the agent called `plan_walk`, the SSE handler relays its tool result as the `walk` frame; otherwise no `walk` frame is emitted"
+- [x] 12.2 Update `CLAUDE.md` if any of its locked V1 invariants need amendment: specifically (a) "single-tool surface" → "two tools (search_places, plan_walk)", (b) "Hard turn cap of 6" → "7", (c) "additionally runs server-side `plan_walk` over cited `place_ids` after `done`" → "if the agent called `plan_walk`, the SSE handler relays its tool result as the `walk` frame; otherwise no `walk` frame is emitted"
 - [ ] 12.3 Add a short dated note `docs/route-planning-2026-05-04.md` describing the OSRM choice (with `/route` vs `/trip` branching), the GeoJSON-not-polyline rationale, the walk-intent soft-hint pattern, the OSM extract refresh procedure, and the `RoutingBackend` swap-in pattern

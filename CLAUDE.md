@@ -91,7 +91,7 @@ Wired in `app/main.py::create_app()` with a single async `lifespan` that builds 
 - `app.state.llm_router` — cost-aware router (`app/llm/router.py`) with two tiers (`local` and `openrouter`), each with its own circuit breaker (3 fails / 60s window / 30s cooldown). Complexity dispatch: `simple` → local tier, `standard`/`complex` → cloud tier. **In V1 both tiers point at OpenRouter** — the split exists so v2 can repoint `LOCAL_LLM_BASE_URL` at an on-device endpoint without code change. Cache is keyed by canonicalized request hash with TTLs that vary by complexity.
 - `app.state.embedder` — `BAAI/bge-small-en-v1.5` sentence-transformer singleton (CPU-only, 384-dim). Weights live in the `hf-cache` volume mounted at `/cache/huggingface`.
 - `app.state.db_engine` / `db_session_factory` — async SQLAlchemy 2 over asyncpg. **Schema is owned by `app/db/migrations/*.sql`**, applied by the postgres entrypoint on first volume init in lex order. ORM models in `app/db/models.py` are read-only mirrors — never call `Base.metadata.create_all` in app code paths. Schema changes require `make nuke && make up`.
-- `app.state.agent_tool_registry` / `agent_loop_builder` — V1 contract registers **exactly one** tool (`search_places`); any other tool name returns an `unknown_tool` error message back to the LLM and the loop continues.
+- `app.state.agent_tool_registry` / `agent_loop_builder` — registers **two tools**: `search_places` (retrieval) and `plan_walk` (LLM-callable OSM-graph router, chosen by the LLM only for tour/route queries); any other tool name returns an `unknown_tool` error message back to the LLM and the loop continues.
 - `app.state.session_logger` — meta-instrumentation harness (`app/meta/`) that writes per-session jsonl files for the report's cost/cycle-time analysis.
 
 Request flow: `RequestIdMiddleware` binds an `X-Request-ID` to structlog contextvars for the lifetime of the request and clears it on the way out. CORS allow-origins come from `API_CORS_ORIGINS`.
@@ -100,11 +100,11 @@ Request flow: `RequestIdMiddleware` binds an `X-Request-ID` to structlog context
 
 `apps/api/app/agent/loop.py` drives the conversation. **Critical invariants — do not loosen without a spec change:**
 
-- Hard turn cap of 6. Hitting the cap is a hard failure (`AgentLoopError`).
+- Hard turn cap of 7. Hitting the cap is a hard failure (`AgentLoopError`).
 - The final turn strips the tool surface and adds a "stop searching, emit JSON now" directive, with `response_format=json` and `max_tokens=8192` (vs. 2048 for tool-call turns) — this gives extended-thinking models like `kimi-k2.6` enough budget for both reasoning and the final JSON.
 - Terminal response is JSON `{narration, citations[]}` with the **strict five-field citation contract**: `doc_id`, `source_url`, `source_type` ∈ {`wikipedia`, `wikidata`, `osm`}, `span`, `retrieval_turn`. Verified by `app/agent/citations.py::verify_citations` against a `RetrievalLedger` of every doc returned in this conversation.
 - One verification retry: on first citation failure, append a corrective user message and re-prompt. If retry also fails, return the response with `verified=False` and a `warning` rather than crashing.
-- `run_streamed()` yields `AgentEvent` objects (`turn`, `tool_call`, `tool_result`, `tool_error`, `narration`, `citations`, `warning`, `done`); `run()` is just the consuming wrapper. The SSE route (`app/routes/agent.py`) frames events as `event: <type>\ndata: <json>\n\n` and additionally runs server-side `plan_walk` over cited `place_ids` after `done`, then re-emits a final `done` so the client has a single terminal marker.
+- `run_streamed()` yields `AgentEvent` objects (`turn`, `tool_call`, `tool_result`, `tool_error`, `narration`, `citations`, `warning`, `done`); `run()` is just the consuming wrapper. The SSE route (`app/routes/agent.py`) frames events as `event: <type>\ndata: <json>\n\n` and if the agent called `plan_walk` during the conversation, the SSE handler relays the tool's most recent successful result as the `walk` frame after `citations` and before the terminal `done`; otherwise no `walk` frame is emitted (informational queries no longer trigger a default 1-stop walk).
 
 ### `apps/api/app/ingest` — One-shot ingestion CLI
 
