@@ -12,7 +12,10 @@ import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 
 export default [
-  { ignores: ["dist", "node_modules", ".vite"] },
+  // Tests are excluded until vitest lands (no devDependency in package.json yet).
+  // The `*.test.tsx` files describe the rendering contract for `WalkTimeline`
+  // and `MapView`; remove this ignore entry alongside adding vitest.
+  { ignores: ["dist", "node_modules", ".vite", "**/*.test.ts", "**/*.test.tsx"] },
   {
     ...js.configs.recommended,
     files: ["**/*.{ts,tsx}"],

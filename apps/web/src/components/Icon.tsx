@@ -75,3 +75,11 @@ export function CrosshairIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function ChevronRightIcon(props: IconProps) {
+  return (
+    <svg {...baseProps} aria-hidden="true" {...props}>
+      <path d="m9 6 6 6-6 6" />
+    </svg>
+  );
+}

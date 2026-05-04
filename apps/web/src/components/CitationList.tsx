@@ -3,13 +3,13 @@
  * `event: citations`.
  */
 
-import type { Citation, PlannedStop } from "@/state/types";
+import type { Citation, PlannedRoute } from "@/state/types";
 
 import { CitationCard } from "./CitationCard";
 
 type Props = {
   citations: Citation[];
-  walk: PlannedStop[];
+  walk: PlannedRoute | null;
   verified: boolean | null;
 };
 
@@ -20,7 +20,7 @@ export function CitationList({ citations, walk, verified }: Props) {
 
   // Best-effort: pull human-readable place names from the walk stops so the
   // citation card can show a real title rather than a slugified doc_id.
-  const titles = new Map(walk.map((s) => [s.doc_id, s.name] as const));
+  const titles = new Map((walk?.stops ?? []).map((s) => [s.doc_id, s.name] as const));
 
   return (
     <section className="space-y-3 border-t border-hairline px-4 py-4">

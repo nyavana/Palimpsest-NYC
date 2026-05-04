@@ -4,6 +4,9 @@
  * Mirror of the dataclasses in `apps/api/app/agent/loop.py` and the SSE
  * serializer in `apps/api/app/routes/agent.py`. The five-field Citation
  * contract is locked — see `swap-llm-tiers-and-lock-mvp-decisions`.
+ *
+ * Route geometry uses GeoJSON LineString on the wire (RFC 7946: `[lon, lat]`).
+ * No polyline encoding — see `agent-route-planning` design §2.
  */
 
 export type SourceType = "wikipedia" | "wikidata" | "osm";
@@ -22,38 +25,63 @@ export type PlannedStop = {
   name: string;
   lat: number;
   lon: number;
+  /**
+   * Legacy V1 field — straight-line haversine distance from the previous stop.
+   * Superseded by `legs[stop.index - 1].distance_m` when `legs` is present.
+   */
+  leg_distance_m?: number;
 };
 
-export type GeoJsonLineString = {
+/**
+ * GeoJSON LineString per RFC 7946.
+ *
+ * Coordinates are ordered `[longitude, latitude]`, NOT `[lat, lon]`. Anywhere
+ * we hand these to the map engine we convert to `{lat, lng}` first.
+ */
+export type GeoJSONLineString = {
   type: "LineString";
   coordinates: [number, number][];
 };
 
-export type WalkStep = {
+/**
+ * One turn-by-turn step inside a leg. The OSRM maneuver is rendered to English
+ * by the api's step formatter; per-step `geometry` is optional in V1.
+ */
+export type RouteStep = {
   instruction: string;
   distance_m: number;
   duration_s: number;
-  maneuver_type?: string;
-  geometry?: GeoJsonLineString;
+  maneuver_type: string;
+  geometry?: GeoJSONLineString;
 };
 
-export type WalkLeg = {
+/**
+ * One leg connects consecutive stops `from_index → to_index`. The leg from
+ * stop `i-1` to stop `i` lives at `legs[i - 1]`; stop 0 has no incoming leg.
+ */
+export type RouteLeg = {
   from_index: number;
   to_index: number;
   distance_m: number;
   duration_s: number;
-  geometry?: GeoJsonLineString;
-  steps?: WalkStep[];
+  geometry: GeoJSONLineString;
+  steps: RouteStep[];
 };
 
-export type WalkPayload = {
+/**
+ * Walk frame payload. The V1 `stops[]` field is preserved; everything below
+ * is additive so older `walk` frames carrying only stops continue to render
+ * (the timeline omits the footer total and per-leg disclosures, the map
+ * falls back to a straight-line path between markers).
+ */
+export type PlannedRoute = {
   stops: PlannedStop[];
-  legs: WalkLeg[];
-  geometry?: GeoJsonLineString;
+  geometry?: GeoJSONLineString;
+  legs?: RouteLeg[];
   total_distance_m?: number;
   total_duration_s?: number;
-  routing_backend?: string;
-  stop_ordering?: string;
+  stop_ordering?: "input_order" | "tsp_optimized";
+  routing_backend?: "osrm" | "haversine_fallback";
 };
 
 export type AgentResultPayload = {
@@ -73,7 +101,7 @@ export type SsePayloads = {
   tool_error: { name: string; error: string };
   narration: { delta?: string; text?: string };
   citations: { citations: Citation[] };
-  walk: WalkPayload;
+  walk: PlannedRoute;
   warning: { message: string };
   done: { result: AgentResultPayload | null };
 };
