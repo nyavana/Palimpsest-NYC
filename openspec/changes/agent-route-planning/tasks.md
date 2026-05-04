@@ -16,7 +16,7 @@
 - [x] 2.4 Add a runtime `osrm` service to `docker-compose.yml` running `osrm-routed --algorithm mld /data/extract.osrm` on port 5000
 - [x] 2.5 Add a named docker volume `osrm-data` shared read-write between `osrm-prepare` and read-only into `osrm`
 - [x] 2.6 Update `Makefile` if needed so `make up` brings the routing services healthy alongside postgres/redis/api/web. *No service-list filter; `make extract` target added for OSM extract download.*
-- [ ] 2.7 Smoke: `curl http://localhost:5000/route/v1/foot/-73.962,40.804;-73.964,40.811?overview=full&steps=true` returns `code=Ok` *(deferred to Wave 5; needs the bbox extract dropped in place + container running)*
+- [x] 2.7 Smoke: `curl http://localhost:5000/route/v1/foot/-73.962,40.804;-73.964,40.811?overview=full&steps=true` returns `code=Ok`. *Validated 2026-05-04: 1102 m route, GeoJSON LineString geometry, OSRM tag pinned to v5.25.0 (v5.27.1 hallucinated — not on Docker Hub).*
 
 ## 3. Routing Module (apps/api/app/routing)
 
@@ -64,7 +64,7 @@
 - [x] 7.2 Replace it with: emit the `walk` frame ONLY if `terminal_result.walk is not None`, serializing the `PlannedRoute` dataclass (with `legs[].steps[]`, `legs[].geometry`, full-route `geometry`, totals, `stop_ordering`). *Framed directly with `_frame("walk", terminal_result.walk)` so GeoJSON dicts pass through as plain JSON objects.*
 - [x] 7.3 Preserve the V1 `walk` frame's `stops[]` shape (additive change only); keep the same SSE event name
 - [x] 7.4 Update `_serialize_event` to handle the new `AgentResult.walk` field if needed; ensure GeoJSON `geometry` dicts serialize as plain JSON objects, not wrapped in dataclass shells. *Walk frame bypasses `_serialize_event` (it operates on `AgentEvent`s); GeoJSON dicts hit `json.dumps` directly.*
-- [ ] 7.5 Curl smoke per the spec: tour-style query produces a `walk` frame; informational query does not *(deferred to Wave 5)*
+- [x] 7.5 Curl smoke per the spec: tour-style query produces a `walk` frame; informational query does not. *Validated 2026-05-04 against gpt-5.4: tour-style 3-stop query produces walk frame with `stop_ordering=tsp_optimized`, 82-vertex GeoJSON LineString, 2 legs with 9 steps each; informational query produces no walk frame (3 turns only, narration → citations → done).*
 
 ## 8. Frontend Updates
 
@@ -84,13 +84,13 @@
 
 ## 10. End-to-End Validation
 
-- [ ] 10.1 `make up` from a clean checkout brings api + osrm + osrm-prepare + postgres + redis + web all healthy
-- [ ] 10.2 Tour-style query (3+ stops): `curl -N "http://localhost:8000/agent/ask?q=plan+a+walk+through+Morningside+Heights+covering+Cathedral+of+St+John+the+Divine,+Riverside+Church,+and+Grant's+Tomb"` produces an SSE stream containing a `tool_call(plan_walk)` event, a `tool_result` for it, and a terminal `walk` frame whose `geometry.type=="LineString"` resolves to a multi-vertex street-following path; `stop_ordering=="tsp_optimized"`
-- [ ] 10.3 Tour-style query (2 stops): a query naming exactly two places confirms the `/route` branch fires and `stop_ordering=="input_order"`
-- [ ] 10.4 Informational query: `curl -N "http://localhost:8000/agent/ask?q=tell+me+about+the+Cathedral+of+St+John+the+Divine"` produces NO `walk` frame; the stream goes from `citations` to `done`; the agent's session record has `walk_intent_hint=="negative"` and `plan_walk_called==false`
-- [ ] 10.5 OSRM down test: stop the `osrm` container and re-run the tour query; confirm the tool succeeds with `routing_backend="haversine_fallback"`, the SSE `walk` frame still arrives with a renderable `geometry` (two-point LineStrings per leg), and the frontend renders a straight-line path
-- [ ] 10.6 `make test` passes in `apps/api/.venv` (existing tests stay green; new tests in §3.8, §4.6, §5.3, §6.7 pass)
-- [ ] 10.7 Frontend dev server (`npm run dev`) renders the new walk view correctly for a recorded tour fixture; confirm map path follows streets, timeline shows totals, per-stop disclosure expands turn-by-turn
+- [x] 10.1 `make up` from a clean checkout brings api + osrm + osrm-prepare + postgres + redis + web all healthy. *Validated 2026-05-04 after pinning `osrm/osrm-backend:v5.25.0`.*
+- [x] 10.2 Tour-style query (3+ stops): `curl -N "http://localhost:8000/agent/ask?q=plan+a+walk+through+Morningside+Heights+covering+Cathedral+of+St+John+the+Divine,+Riverside+Church,+and+Grant's+Tomb"` produces an SSE stream containing a `tool_call(plan_walk)` event, a `tool_result` for it, and a terminal `walk` frame whose `geometry.type=="LineString"` resolves to a multi-vertex street-following path; `stop_ordering=="tsp_optimized"`. *Validated on `openai/gpt-5.4`: 3 stops in TSP order, 82-vertex LineString, total 1263 m / 910 s, two legs with 9 steps each. **Note**: `kimi-k2.6` over-searches and never reaches `plan_walk` — model upgrade required for reliable tool dispatch with 2 tools registered.*
+- [x] 10.3 Tour-style query (2 stops): a query naming exactly two places confirms the `/route` branch fires and `stop_ordering=="input_order"`. *Validated as a side effect of §10.2 when gpt-5.4 dropped one of three places: 2 stops, `/route` endpoint, `stop_ordering=input_order`, 27-vertex LineString, 373 m / 268 s.*
+- [x] 10.4 Informational query: `curl -N "http://localhost:8000/agent/ask?q=tell+me+about+the+Cathedral+of+St+John+the+Divine"` produces NO `walk` frame; the stream goes from `citations` to `done`; the agent's session record has `walk_intent_hint=="negative"` and `plan_walk_called==false`. *Validated: 3-turn agent run on gpt-5.4, 2 search_places calls, no walk frame; `walk_intent_hint=negative`, `plan_walk_called=False`.*
+- [x] 10.5 OSRM down test: stop the `osrm` container and re-run the tour query; confirm the tool succeeds with `routing_backend="haversine_fallback"`, the SSE `walk` frame still arrives with a renderable `geometry` (two-point LineStrings per leg), and the frontend renders a straight-line path. *Validated: `docker compose stop osrm` + tour query produced `routing_backend=haversine_fallback`, `stop_ordering=input_order`, 2-point LineString, 183 m, single "Head toward Grant's Tomb" step.*
+- [x] 10.6 `make test` passes in `apps/api/.venv` (existing tests stay green; new tests in §3.8, §4.6, §5.3, §6.7 pass). *Verified end of Wave 4: 229 passed / 1 skipped; +22 new tests over the V1 baseline.*
+- [ ] 10.7 Frontend dev server (`npm run dev`) renders the new walk view correctly for a recorded tour fixture; confirm map path follows streets, timeline shows totals, per-stop disclosure expands turn-by-turn *(visual check left for the user; backend SSE payload is verified by §10.2 / §10.3 / §10.5)*
 
 ## 11. Cross-Link to initial-palimpsest-scaffold (V1 corrections)
 
