@@ -55,6 +55,15 @@ class SessionRecord(BaseModel):
     notes: str = ""
     tags: dict[str, str] = Field(default_factory=dict)
 
+    # ── Walk-decision telemetry (agent-route-planning, §9.1) ──────────
+    # Defaults preserve backward compatibility for existing records and
+    # for sessions captured outside the SSE handler (e.g. seeded scaffold
+    # records).
+    plan_walk_called: bool = False
+    routing_backend: str | None = None
+    stop_ordering: str | None = None
+    walk_intent_hint: str = "neutral"
+
 
 @dataclass
 class _Summary:
