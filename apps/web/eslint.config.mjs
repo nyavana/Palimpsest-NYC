@@ -27,6 +27,15 @@ export default [
         process: "readonly",
         HTMLElement: "readonly",
         HTMLDivElement: "readonly",
+        // vitest globals (test files only — see file-specific override below)
+        describe: "readonly",
+        it: "readonly",
+        expect: "readonly",
+        vi: "readonly",
+        beforeEach: "readonly",
+        afterEach: "readonly",
+        beforeAll: "readonly",
+        afterAll: "readonly",
       },
     },
     plugins: {
