@@ -45,18 +45,18 @@
 - [x] 5.1 Create `apps/api/app/agent/intent.py` with `classify_walk_intent(query: str) -> Literal["positive", "negative", "neutral"]` implementing the regex/keyword rules in the agent-tools spec
 - [x] 5.2 Curate a fixture set of ~30 hand-labeled queries (~10 each label) at `apps/api/tests/fixtures/walk_intent_queries.json` *(10/10/10)*
 - [x] 5.3 Unit test `apps/api/tests/test_walk_intent.py` asserting the classifier matches the labeled fixtures *(54 tests pass)*
-- [ ] 5.4 Update the agent loop builder so the system prompt is templated from `_SYSTEM_PROMPT + INTENT_NOTE[label]`. The `neutral` label appends nothing
-- [ ] 5.5 Capture `walk_intent_hint: str` on `AgentResult` so the SSE handler / telemetry can record it without re-classifying
+- [x] 5.4 Update the agent loop builder so the system prompt is templated from `_SYSTEM_PROMPT + INTENT_NOTE[label]`. The `neutral` label appends nothing
+- [x] 5.5 Capture `walk_intent_hint: str` on `AgentResult` so the SSE handler / telemetry can record it without re-classifying
 
 ## 6. Agent Loop Update
 
-- [ ] 6.1 In `apps/api/app/agent/loop.py`, raise `MAX_TURNS_DEFAULT` from 6 to 7
-- [ ] 6.2 Extend the `_SYSTEM_PROMPT` with the "when to call plan_walk" rubric described in design §7 (preserve all existing rules verbatim)
-- [ ] 6.3 Add `walk: PlannedRoute | None` and `walk_intent_hint: Literal["positive", "negative", "neutral"]` to `AgentResult`; defaults `None` and `"neutral"`
-- [ ] 6.4 Capture the latest successful `plan_walk` tool result into `AgentResult.walk`; replace on each successful call (most recent wins)
-- [ ] 6.5 Pass `routing_backend` from `app.state` into `ToolExecutionContext` at the SSE handler entry point
-- [ ] 6.6 Append the §5.4 INTENT_NOTE line to the system prompt at loop construction time (not at every turn) and store the label on `AgentResult`
-- [ ] 6.7 Update or add tests in `apps/api/tests/test_agent_loop.py` covering: (a) tour-style query (`positive` hint) → `plan_walk` is called, AgentResult.walk is populated; (b) informational query (`negative` hint) → `plan_walk` is not called, AgentResult.walk is `None`; (c) ambiguous (`neutral`) query → both behaviors valid; (d) two `plan_walk` calls → only the second is retained on AgentResult.walk
+- [x] 6.1 In `apps/api/app/agent/loop.py`, raise `MAX_TURNS_DEFAULT` from 6 to 7
+- [x] 6.2 Extend the `_SYSTEM_PROMPT` with the "when to call plan_walk" rubric described in design §7 (preserve all existing rules verbatim)
+- [x] 6.3 Add `walk: PlannedRoute | None` and `walk_intent_hint: Literal["positive", "negative", "neutral"]` to `AgentResult`; defaults `None` and `"neutral"`. *PlannedRoute aliased to `dict[str, Any]` for V1.*
+- [x] 6.4 Capture the latest successful `plan_walk` tool result into `AgentResult.walk`; replace on each successful call (most recent wins)
+- [ ] 6.5 Pass `routing_backend` from `app.state` into `ToolExecutionContext` at the SSE handler entry point *(deferred to Wave 4)*
+- [x] 6.6 Append the §5.4 INTENT_NOTE line to the system prompt at loop construction time (not at every turn) and store the label on `AgentResult`. *Run-time templating in `run_streamed`; the prompt module-level constant stays untouched.*
+- [x] 6.7 Update or add tests in `apps/api/tests/test_agent_loop.py` covering: (a) tour-style query (`positive` hint) → `plan_walk` is called, AgentResult.walk is populated; (b) informational query (`negative` hint) → `plan_walk` is not called, AgentResult.walk is `None`; (c) ambiguous (`neutral`) query → both behaviors valid; (d) two `plan_walk` calls → only the second is retained on AgentResult.walk. *8 new tests; full suite 223 passed/1 skipped.*
 
 ## 7. SSE Handler Update
 
