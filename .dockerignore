@@ -1,0 +1,39 @@
+# Repo-root .dockerignore — applies to every build that uses repo root as
+# context (postgres image, api image). Keeps build context small and prevents
+# secrets / build artifacts from accidentally landing in image layers.
+
+# VCS + CI
+.git
+.gitignore
+.github
+
+# Dev venvs and caches
+.eval-venv
+**/.venv
+**/__pycache__
+**/.mypy_cache
+**/.ruff_cache
+**/.pytest_cache
+
+# Node
+node_modules
+**/node_modules
+**/dist
+**/.tsbuildinfo*
+
+# Local-only data
+logs
+data/raw_cache
+
+# Docs and prose — large, never needed at runtime. App READMEs are exceptions
+# because pyproject.toml's `readme = "README.md"` requires them at install time.
+docs
+*.md
+!apps/api/README.md
+!apps/worker/README.md
+!apps/web/README.md
+
+# Secrets
+.env
+.env.*
+!.env.example

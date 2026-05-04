@@ -37,6 +37,13 @@ RUN apt-get update \
 
 WORKDIR /app
 
+# CPU-only torch wheel — installed first so sentence-transformers' transitive
+# torch dep is already satisfied when the project install runs. Skipping this
+# step pulls the default CUDA build (~2 GB of NVIDIA payload we never use).
+RUN /opt/venv/bin/pip install \
+        --index-url https://download.pytorch.org/whl/cpu \
+        torch
+
 # Install API deps into the venv
 COPY apps/api/pyproject.toml /app/pyproject.toml
 COPY apps/api/README.md /app/README.md

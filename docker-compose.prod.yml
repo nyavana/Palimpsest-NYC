@@ -1,15 +1,19 @@
-# Palimpsest NYC — local development stack
+# Palimpsest NYC — production compose (pull-only, no local build).
 #
-# Brings up: postgres (postgis + pgvector + pg_trgm), redis, api, worker, web.
-# V1 is online-only — every LLM call terminates at OpenRouter (see .env), so
-# no host-gateway escape hatch is required.
+# Usage:
+#   cp .env.example .env  # set OPENROUTER_API_KEY
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+#   docker compose -f docker-compose.prod.yml exec api python -m app.ingest.cli osm run
+#   docker compose -f docker-compose.prod.yml exec api python -m app.ingest.cli wikipedia run
+#   open http://localhost:5173
+#
+# Pin a specific release with PALIMPSEST_TAG, e.g.:
+#   PALIMPSEST_TAG=v0.1.0 docker compose -f docker-compose.prod.yml up -d
 
 services:
   postgres:
-    build:
-      context: .
-      dockerfile: docker/postgres/Dockerfile
-    image: palimpsest/postgres:16-postgis-pgvector
+    image: ghcr.io/nyavana/palimpsest-postgres:${PALIMPSEST_TAG:-latest}
     container_name: palimpsest-postgres
     env_file: .env
     environment:
@@ -18,9 +22,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      # V1 single migration surface — postgres entrypoint applies *.sql in lex
-      # order on first volume init. Schema changes require `make nuke && make up`.
-      - ./apps/api/app/db/migrations:/docker-entrypoint-initdb.d:ro
     ports:
       - "5432:5432"
     healthcheck:
@@ -56,10 +57,7 @@ services:
     restart: unless-stopped
 
   api:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
-    image: palimpsest/api:dev
+    image: ghcr.io/nyavana/palimpsest-api:${PALIMPSEST_TAG:-latest}
     container_name: palimpsest-api
     env_file: .env
     environment:
@@ -70,8 +68,6 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - ./apps/api/app:/app/app
-      - ./apps/api/tests:/app/tests
       - ./logs:/app/logs
       - ./data:/app/data
       - hf-cache:/cache/huggingface
@@ -84,14 +80,10 @@ services:
       - 0.0.0.0
       - --port
       - "8000"
-      - --reload
     restart: unless-stopped
 
   worker:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
-    image: palimpsest/api:dev
+    image: ghcr.io/nyavana/palimpsest-api:${PALIMPSEST_TAG:-latest}
     container_name: palimpsest-worker
     env_file: .env
     depends_on:
@@ -100,8 +92,6 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - ./apps/api/app:/app/app
-      - ./apps/worker/worker:/app/worker
       - ./logs:/app/logs
     command:
       - /opt/venv/bin/python
@@ -110,13 +100,7 @@ services:
     restart: unless-stopped
 
   web:
-    build:
-      context: ./apps/web
-      dockerfile: Dockerfile
-      args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
-        VITE_MAP_ENGINE: ${VITE_MAP_ENGINE}
-    image: palimpsest/web:dev
+    image: ghcr.io/nyavana/palimpsest-web:${PALIMPSEST_TAG:-latest}
     container_name: palimpsest-web
     ports:
       - "5173:80"
