@@ -67,7 +67,8 @@ Full design: [`openspec/changes/initial-palimpsest-scaffold/design.md`](../opens
 | §12.5 | Frontend rendering | React `EventSource` consumer with map markers + flyTo | ⏳ next |
 | §13.4 / §13.6 | Eval + cost analysis | 5 hand-graded walks; ~10-walk free-vs-paid model comparison | ⏳ next |
 | §13.7 / §13.8 | Final report + 30s demo video | | ⏳ next |
-| §13.1-§13.3 / §14 | Live-data sources + VPS deploy | | deferred to v2 |
+| post-§14 | Docker image publishing | Three images on ghcr.io (`palimpsest-{api,web,postgres}`), built and pushed by GitHub Actions on `main` and `v*` tags | ✓ shipped |
+| §13.1-§13.3 / §14 | Live-data sources + hosted VPS demo | | deferred to v2 |
 
 **Numbers as of milestone 1**: 928 places + 323 documents in postgres, all with 384-dim embeddings. 120 unit tests pass. End-to-end agent run (question → narration → 3 verified citations → ordered walk) validated live with `kimi-k2.6` via OpenRouter.
 
@@ -122,6 +123,19 @@ make setup
 # activate the api venv for interactive work
 source apps/api/.venv/bin/activate
 ```
+
+---
+
+## Deployment
+
+V1 has two paths:
+
+- **Run from published images.** `docker-compose.prod.yml` pulls `ghcr.io/nyavana/palimpsest-{api,web,postgres}:${PALIMPSEST_TAG:-latest}`. No Python or Node toolchain on the host. The api image is around 760 MB uncompressed (CPU-only torch wheel); postgres ships with the V1 migrations baked into `/docker-entrypoint-initdb.d`. See the [Quickstart in README](../README.md#quickstart) for the exact commands.
+- **Build from source.** `make up` builds the same three images locally from the Dockerfiles in `apps/api/`, `apps/web/`, and `docker/postgres/`. Use this when developing against the project.
+
+Image publishing is automated. [`.github/workflows/docker-publish.yml`](../.github/workflows/docker-publish.yml) runs three matrix jobs (api, web, postgres) on push to `main`, on `v*` tags, on PRs into `main` (verification only — no `latest` move), and on manual `workflow_dispatch`. Auth uses the built-in `GITHUB_TOKEN`. Layer caching is `type=gha`. Platforms is `linux/amd64`; arm64 is a one-line addition once amd64 is proven.
+
+A hosted demo on a VPS or PaaS is still v2 work — V1 expects the grader to bring the stack up locally with one of the two paths above.
 
 ---
 

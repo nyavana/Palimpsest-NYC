@@ -21,6 +21,16 @@ make api-shell    # bash inside the api container
 make db-shell     # psql inside the postgres container
 ```
 
+Run from the published images (no local build):
+
+```bash
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+# pin a release: PALIMPSEST_TAG=v0.1.0 docker compose -f docker-compose.prod.yml up -d
+```
+
+The three images live at `ghcr.io/nyavana/palimpsest-{api,web,postgres}` and are published by `.github/workflows/docker-publish.yml` on push to `main`, on `v*` tags, on PRs into `main` (PR builds tagged with `sha-<short>` only — they don't move `latest`), and on manual `workflow_dispatch`.
+
 Local Python dev (each subproject owns its own `.venv`; prefer `uv`):
 
 ```bash

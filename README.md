@@ -23,39 +23,82 @@ The four properties below are enforced in code, not aspirational:
 
 ## Quickstart
 
-Prereqs: Docker (with `compose` v2), `uv` (or Python 3.12 + `venv`), Node 20+. You will need an `OPENROUTER_API_KEY`.
+Prereqs: Docker (with `compose` v2). You will need an `OPENROUTER_API_KEY`.
 
-Bring up the full stack (Postgres + PostGIS + pgvector, Redis, the FastAPI API, the heartbeat worker, and the React web app) with a single command:
+Three images are published to ghcr.io and pulled by `docker-compose.prod.yml`. No Python or Node toolchain on the host, no local build step.
 
 ```bash
 # 1. configure environment
 cp .env.example .env
 # edit .env to set OPENROUTER_API_KEY
 
-# 2. bring the stack up
-make up
+# 2. pull and start
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
 
-# 3. follow logs
-make logs
-
-# 4. hit the health check
+# 3. health check
 curl http://localhost:8000/health
 # → {"status":"ok"}
 
-# 5. open the frontend
+# 4. open the frontend
 open http://localhost:5173
 ```
 
-To stop everything: `make down`.
+The corpus is empty until you run the ingestion CLIs once — see [Try the agent](#try-the-agent) below.
 
-Note: schema changes require `make nuke && make up`, because the schema is owned by `apps/api/app/db/migrations/*.sql` and is applied by the postgres entrypoint on first volume init. ORM `create_all` is never used in app code paths.
+To stop the stack while keeping the corpus and embeddings cache:
+
+```bash
+docker compose -f docker-compose.prod.yml down
+```
+
+To wipe the volumes too (drops the corpus, requires a fresh ingest on next start):
+
+```bash
+docker compose -f docker-compose.prod.yml down -v
+```
+
+The published images:
+
+| Image | Purpose |
+|---|---|
+| `ghcr.io/nyavana/palimpsest-api` | FastAPI backend, agent loop, ingestion CLI. The worker reuses this image with a different command. |
+| `ghcr.io/nyavana/palimpsest-web` | React SPA built into nginx. Routes `/api/*` to the api service over the compose network. |
+| `ghcr.io/nyavana/palimpsest-postgres` | PostGIS 16 + pgvector + pg_trgm, with the V1 migrations baked into `/docker-entrypoint-initdb.d`. |
+
+The `latest` tag tracks `main`; semver tags (`v0.1.0`, `0.1`) come from git tags. Pin a release with `PALIMPSEST_TAG`:
+
+```bash
+PALIMPSEST_TAG=v0.1.0 docker compose -f docker-compose.prod.yml pull
+PALIMPSEST_TAG=v0.1.0 docker compose -f docker-compose.prod.yml up -d
+```
+
+The api image is around 760 MB uncompressed — `torch` is pulled from the CPU-only PyTorch index, so none of the CUDA payload is along for the ride.
+
+## Build from source
+
+If you want to develop against the project rather than just run it, build the stack locally with `make up`. This needs Docker plus `uv` (or Python 3.12 + `venv`) and Node 20+ on the host.
+
+```bash
+cp .env.example .env
+make up        # build and start
+make logs      # tail container logs
+curl http://localhost:8000/health
+open http://localhost:5173
+```
+
+Stop with `make down`, or `make nuke` to drop the volumes too. Schema changes require `make nuke && make up`, because the schema is owned by `apps/api/app/db/migrations/*.sql` and is applied by the postgres entrypoint on first volume init. ORM `create_all` is never used in app code paths.
 
 ## Try the agent
 
-Once the stack is up, populate the corpus once and ask the agent a walking-tour question:
+Once the stack is up, populate the corpus once and ask the agent a walking-tour question. Pick the `exec` command that matches how you started the stack:
 
 ```bash
 # 1. populate the 5km² Morningside Heights + UWS corpus (~30s total)
+# published images:
+docker compose -f docker-compose.prod.yml exec api python -m app.ingest.cli osm run
+docker compose -f docker-compose.prod.yml exec api python -m app.ingest.cli wikipedia run
+# or, if you built from source:
 docker compose exec api python -m app.ingest.cli osm run
 docker compose exec api python -m app.ingest.cli wikipedia run
 
@@ -136,12 +179,13 @@ V1 ships the smallest end-to-end system that answers a citation-grounded walking
 - Single-tool agent + five-field citation verifier + server-side walk planner
 - SSE endpoint, frontend EventSource consumer, map markers + `flyTo`
 - Per-session telemetry harness for cost / cycle-time / failure-mode analysis
+- Docker images published to ghcr.io on every `main` push and on `v*` tags, pulled by `docker-compose.prod.yml`
 
 **V2, planned:**
 
 - On-device LLM endpoint via the same env-driven router tier
 - Live data sources: Chronicling America, NYPL, NYC Open Data, MTA, NOAA
-- VPS deploy + scheduler in `apps/worker`
+- Hosted demo (VPS or PaaS) and a scheduler in `apps/worker`
 
 ## Further reading
 
