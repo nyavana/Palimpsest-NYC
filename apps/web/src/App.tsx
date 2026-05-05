@@ -22,7 +22,11 @@ export default function App() {
     <MapEngineProvider>
       <div className="flex h-full w-full flex-col lg:flex-row">
         <main className="relative h-[55vh] w-full flex-1 lg:h-full">
-          <MapView stops={session.state.walk} citations={session.state.citations} />
+          <MapView
+            stops={session.state.walk}
+            citations={session.state.citations}
+            geometry={session.state.walkGeometry}
+          />
           <header className="pointer-events-none absolute left-4 top-4 rounded bg-ink/85 px-3 py-2 font-serif text-parchment shadow-chip backdrop-blur-sm">
             <h1 className="text-h2 font-semibold leading-tight">Palimpsest NYC</h1>
             <p className="text-small font-sans opacity-80">

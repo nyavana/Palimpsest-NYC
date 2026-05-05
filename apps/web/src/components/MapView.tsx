@@ -12,7 +12,7 @@ import { createPortal } from "react-dom";
 
 import { DEFAULT_VIEWPORT, createMapEngine, type MapEngine } from "@/map";
 import type { LatLng, MarkerEvent, Viewport } from "@/map";
-import type { Citation, PlannedStop } from "@/state/types";
+import type { Citation, GeoJsonLineString, PlannedStop } from "@/state/types";
 import { useMapEngineHandle } from "@/state/MapEngineContext";
 
 import { MarkerInfoCard } from "./MarkerInfoCard";
@@ -33,6 +33,11 @@ const PINNED_FLY_MIN_ZOOM = 17.5;
 type Props = {
   stops: PlannedStop[];
   citations: Citation[];
+  /**
+   * Routed polyline (OSRM/walking-net) for the path. When present, drawn
+   * as the walk path instead of straight-line segments through stops.
+   */
+  geometry?: GeoJsonLineString | null;
 };
 
 type MarkerFocus =
@@ -51,7 +56,7 @@ function parseStopIndex(markerId: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export function MapView({ stops, citations }: Props) {
+export function MapView({ stops, citations, geometry = null }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const popupHostRef = useRef<HTMLDivElement | null>(null);
   const cameraRef = useRef<Viewport>({ ...DEFAULT_VIEWPORT });
@@ -190,8 +195,13 @@ export function MapView({ stops, citations }: Props) {
       return;
     }
 
-    const coords = stops.map((s) => ({ lat: s.lat, lng: s.lon }));
-    engine.addPath(WALK_LAYER, coords, { color: PATH_COLOR, widthPx: 4, opacity: 0.85 });
+    // Prefer the routed geometry (street-following polyline) when the API
+    // provides it; fall back to straight-line segments through the stops.
+    const pathCoords: LatLng[] =
+      geometry && geometry.coordinates.length >= 2
+        ? geometry.coordinates.map(([lng, lat]) => ({ lat, lng }))
+        : stops.map((s) => ({ lat: s.lat, lng: s.lon }));
+    engine.addPath(WALK_LAYER, pathCoords, { color: PATH_COLOR, widthPx: 4, opacity: 0.85 });
     engine.addMarkers(
       WALK_LAYER,
       stops.map((s) => ({
@@ -209,7 +219,7 @@ export function MapView({ stops, citations }: Props) {
         FLYTO_DURATION_MS,
       );
     }
-  }, [stops, ready, viewMode]);
+  }, [stops, geometry, ready, viewMode]);
 
   const handleViewModeChange = (next: MapViewMode) => {
     setViewMode(next);

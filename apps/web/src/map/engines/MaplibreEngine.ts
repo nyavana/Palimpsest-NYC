@@ -115,7 +115,7 @@ export class MaplibreEngine implements MapEngine {
   addMarkers(layerId: string, markers: Marker[]): void {
     const map = this.requireMap();
     const layerKey = MARKER_LAYER_PREFIX + layerId;
-    this.clearLayer(layerId);
+    this.clearMarkers(layerId);
     const instances: MlMarker[] = [];
     for (const m of markers) {
       const el = document.createElement("div");
@@ -142,7 +142,7 @@ export class MaplibreEngine implements MapEngine {
   addPath(layerId: string, coords: LatLng[], style: PathStyle = {}): void {
     const map = this.requireMap();
     const sourceId = PATH_LAYER_PREFIX + layerId;
-    this.clearLayer(layerId);
+    this.clearPath(layerId);
 
     map.addSource(sourceId, {
       type: "geojson",
@@ -173,10 +173,12 @@ export class MaplibreEngine implements MapEngine {
   }
 
   clearLayer(layerId: string): void {
-    const map = this.map;
-    if (map === null) {
-      return;
-    }
+    this.clearMarkers(layerId);
+    this.clearPath(layerId);
+  }
+
+  private clearMarkers(layerId: string): void {
+    if (this.map === null) return;
     const markerKey = MARKER_LAYER_PREFIX + layerId;
     const markerLayer = this.markerLayers.get(markerKey);
     if (markerLayer) {
@@ -188,8 +190,13 @@ export class MaplibreEngine implements MapEngine {
     // Bus listeners were attached on the (now-removed) marker DOM nodes.
     // Maplibre's Marker.remove() detaches the elements from the DOM, but
     // our listeners remain on the orphaned nodes — they'll be garbage
-    // collected when nothing else holds them. detachAll on destroy below
+    // collected when nothing else holds them. detachAll on destroy
     // handles the explicit teardown.
+  }
+
+  private clearPath(layerId: string): void {
+    const map = this.map;
+    if (map === null) return;
     const pathKey = PATH_LAYER_PREFIX + layerId;
     if (this.pathLayers.has(pathKey)) {
       if (map.getLayer(pathKey)) {

@@ -22,7 +22,38 @@ export type PlannedStop = {
   name: string;
   lat: number;
   lon: number;
-  leg_distance_m: number;
+};
+
+export type GeoJsonLineString = {
+  type: "LineString";
+  coordinates: [number, number][];
+};
+
+export type WalkStep = {
+  instruction: string;
+  distance_m: number;
+  duration_s: number;
+  maneuver_type?: string;
+  geometry?: GeoJsonLineString;
+};
+
+export type WalkLeg = {
+  from_index: number;
+  to_index: number;
+  distance_m: number;
+  duration_s: number;
+  geometry?: GeoJsonLineString;
+  steps?: WalkStep[];
+};
+
+export type WalkPayload = {
+  stops: PlannedStop[];
+  legs: WalkLeg[];
+  geometry?: GeoJsonLineString;
+  total_distance_m?: number;
+  total_duration_s?: number;
+  routing_backend?: string;
+  stop_ordering?: string;
 };
 
 export type AgentResultPayload = {
@@ -42,7 +73,7 @@ export type SsePayloads = {
   tool_error: { name: string; error: string };
   narration: { delta?: string; text?: string };
   citations: { citations: Citation[] };
-  walk: { stops: PlannedStop[] };
+  walk: WalkPayload;
   warning: { message: string };
   done: { result: AgentResultPayload | null };
 };

@@ -11,7 +11,6 @@ const stop: PlannedStop = {
   name: "Low Memorial Library",
   lat: 40.808,
   lon: -73.961,
-  leg_distance_m: 0,
 };
 
 const citation: Citation = {

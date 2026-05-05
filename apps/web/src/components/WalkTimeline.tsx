@@ -10,7 +10,7 @@
 
 import { useState } from "react";
 
-import type { PlannedStop } from "@/state/types";
+import type { PlannedStop, WalkLeg } from "@/state/types";
 import { useMapEngineHandle } from "@/state/MapEngineContext";
 import { WALK_MS_PER_STEP } from "@/styles/tokens";
 
@@ -18,22 +18,32 @@ import { CrosshairIcon } from "./Icon";
 
 type Props = {
   stops: PlannedStop[];
+  legs?: WalkLeg[];
 };
 
 const DEFAULT_FLYTO_ZOOM = 17.5;
 
-function formatLeg(leg_distance_m: number): string | null {
-  if (leg_distance_m <= 0) return null;
+function formatLeg(leg_distance_m: number | undefined): string | null {
+  if (leg_distance_m === undefined || !Number.isFinite(leg_distance_m) || leg_distance_m <= 0) {
+    return null;
+  }
   const meters = Math.round(leg_distance_m);
   const minutes = Math.max(1, Math.round(leg_distance_m / WALK_MS_PER_STEP));
   return `${meters} m  ·  ~${minutes} min`;
 }
 
-export function WalkTimeline({ stops }: Props) {
+export function WalkTimeline({ stops, legs = [] }: Props) {
   const handle = useMapEngineHandle();
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   if (stops.length === 0) return null;
+
+  // For stop N (N > 0), the arriving leg is the one with to_index === N.
+  const distanceForStop = (index: number): number | undefined => {
+    if (index === 0) return undefined;
+    const leg = legs.find((l) => l.to_index === index);
+    return leg?.distance_m;
+  };
 
   const flyTo = (stop: PlannedStop) => {
     const engine = handle.get();
@@ -55,7 +65,7 @@ export function WalkTimeline({ stops }: Props) {
       <ol className="space-y-1">
         {stops.map((stop) => {
           const active = stop.index === activeIndex;
-          const leg = formatLeg(stop.leg_distance_m);
+          const leg = formatLeg(distanceForStop(stop.index));
           return (
             <li key={`${stop.index}:${stop.doc_id}`}>
               <button

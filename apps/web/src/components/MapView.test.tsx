@@ -59,8 +59,8 @@ vi.mock("@/state/useWikipediaSummary", () => ({
 }));
 
 const stops: PlannedStop[] = [
-  { index: 0, doc_id: "wikipedia:Low_Memorial_Library", name: "Low Memorial Library", lat: 40.808, lon: -73.961, leg_distance_m: 0 },
-  { index: 1, doc_id: "wikipedia:Cathedral_of_St._John_the_Divine", name: "Cathedral of St. John the Divine", lat: 40.804, lon: -73.96, leg_distance_m: 250 },
+  { index: 0, doc_id: "wikipedia:Low_Memorial_Library", name: "Low Memorial Library", lat: 40.808, lon: -73.961 },
+  { index: 1, doc_id: "wikipedia:Cathedral_of_St._John_the_Divine", name: "Cathedral of St. John the Divine", lat: 40.804, lon: -73.96 },
 ];
 
 const citations: Citation[] = [
