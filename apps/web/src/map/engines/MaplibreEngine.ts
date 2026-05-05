@@ -123,8 +123,8 @@ export class MaplibreEngine implements MapEngine {
       el.style.width = "14px";
       el.style.height = "14px";
       el.style.borderRadius = "50%";
-      el.style.background = m.color ?? "#0a0a0a";
-      el.style.border = "2px solid #f5f0e6";
+      el.style.background = m.color ?? "#1A1F3A";
+      el.style.border = "2px solid #EDF1FD";
       el.style.boxShadow = "0 1px 4px rgba(0,0,0,0.3)";
       el.style.cursor = "pointer";
       if (m.label) {
@@ -162,7 +162,7 @@ export class MaplibreEngine implements MapEngine {
       source: sourceId,
       layout: { "line-cap": "round", "line-join": "round" },
       paint: {
-        "line-color": style.color ?? "#0a0a0a",
+        "line-color": style.color ?? "#1A1F3A",
         "line-width": style.widthPx ?? 4,
         "line-opacity": style.opacity ?? 0.9,
         ...(style.dashed ? { "line-dasharray": [2, 2] } : {}),

@@ -14,24 +14,34 @@ manuscript whose old text shows through under the new. The visual direction
 follows that brief literally rather than chasing the default "AI-app aesthetic"
 of gray cards, muted purples, and Inter-everywhere.
 
+The palette is the cool **twilight archive** set sourced from
+`docs/assets/Color.webp` — five colors that read as dusk over a stained-glass
+manuscript: pale lavender, deep plum, royal indigo, sky blue, bright magenta.
+The set is treated as flat fills, never as blends. The structure stays
+editorial: sharp 4 px corners, hairline dividers, no card shadows.
+
 Three constraints fall out of that:
 
 - **Editorial, not generic LLM**. Serif for headlines and pull-quotes (IBM Plex
   Serif), humanist sans for UI (Inter), monospaced for `doc_id` and other
-  identifiers (IBM Plex Mono). No pink/purple AI gradients (anti-pattern called
-  out by the design skill).
-- **Parchment and ink, not white-on-gray**. Background is a warm off-white
-  (`parchment` `#f5f0e6`); foreground is true ink (`ink` `#0a0a0a`). All cards
-  sit on parchment, separated by thin ink-tinted hairlines instead of drop
-  shadows.
-- **One archival accent**. A brick / oxblood that echoes Morningside-Heights
-  brownstones and the Low Memorial Library facade, used for the primary CTA and
-  the active stop on the walk. Citation links pick up an archival-blue
-  reminiscent of Wikipedia source links — different role from the CTA, so users
-  never have to guess which color means "act" vs. which means "go read".
+  identifiers (IBM Plex Mono). The palette is purposefully cool and refined —
+  applied as flat fills, never as gradients or AI-purple haze.
+- **Lavender and indigo, not white-on-gray**. Background is a pale lavender
+  (`parchment` `#EDF1FD`); foreground is a deep indigo near-black (`ink`
+  `#1A1F3A`). All cards sit on the lavender surface, separated by thin
+  indigo-tinted hairlines instead of drop shadows.
+- **Two-tone accent, plum and indigo**. A deep plum (`oxblood` `#77295D`,
+  legacy name) carries the primary CTA and the active stop on the walk. A
+  royal indigo (`archival-blue` `#5364C0`, legacy name) carries citation
+  links — different role from the CTA, so users never have to guess which
+  color means "act" vs. which means "go read". A bright magenta accent
+  (`ochre` `#C34FA2`, legacy name) is reserved for the warning banner edge.
 
 These choices are the v1 tokens in §3. They are intentionally narrow so the
-implementation cannot drift back into a generic palette.
+implementation cannot drift back into a generic palette. The historic token
+names (`parchment`, `ink`, `oxblood`, `archival-blue`, `ochre`) are kept as
+load-bearing legacy: their values now reflect the twilight set, but every
+component class still resolves through the same names.
 
 ## 2. Layout grid
 
@@ -96,26 +106,31 @@ without committing to phone-tuned tap targets. A real mobile pass is v2.
 
 | Token | Hex | Role |
 |---|---|---|
-| `parchment` | `#f5f0e6` | base background |
-| `parchment-deep` | `#ece5d5` | secondary/elevated surface (citations, composer) |
-| `ink` | `#0a0a0a` | primary text & icons |
-| `ink-soft` | `#3a3a3a` | secondary text, captions |
-| `ink-muted` | `#6f6a5f` | tertiary, helper text, leg-distance labels |
-| `hairline` | `rgba(10,10,10,0.10)` | dividers |
-| `oxblood` | `#7a1f1f` | primary CTA, active walk stop |
-| `oxblood-hover` | `#5e1717` | CTA hover/pressed |
-| `archival-blue` | `#1d4ed8` | citation source links |
-| `archival-blue-visited` | `#5b21b6` | visited source link |
-| `ochre` | `#b6873e` | warnings (verifier failure, retry) |
-| `success` | `#3b6e3b` | verified-citations confirmation |
+| `parchment` | `#EDF1FD` | base background — pale lavender |
+| `parchment-deep` | `#DDE3F4` | secondary/elevated surface (citations, composer) |
+| `ink` | `#1A1F3A` | primary text & icons — deep indigo near-black |
+| `ink-soft` | `#3D4566` | secondary text, captions |
+| `ink-muted` | `#6A6F8C` | tertiary, helper text, leg-distance labels |
+| `hairline` | `rgba(83,100,192,0.18)` | dividers — indigo-tinted |
+| `oxblood` | `#77295D` | primary CTA, active walk stop — deep plum |
+| `oxblood-hover` | `#5A1E48` | CTA hover/pressed |
+| `archival-blue` | `#5364C0` | citation source links — royal indigo |
+| `archival-blue-visited` | `#6B3380` | visited source link |
+| `ochre` | `#C34FA2` | warnings (verifier failure, retry) — bright magenta |
+| `success` | `#4A8A6E` | verified-citations confirmation — teal-leaning green |
 | `wikipedia` | `#36c` | source-type chip: Wikipedia |
 | `wikidata` | `#990000` | source-type chip: Wikidata |
 | `osm` | `#7ebc6f` | source-type chip: OpenStreetMap |
 
-`hairline` is a translucent ink so it works equally on parchment and
-parchment-deep. The three source-type chip colors come from each project's own
-brand palette so the chip reads as "this came from there", not as a Palimpsest
-choice.
+`hairline` is a translucent indigo so it sits naturally on both `parchment`
+and `parchment-deep`. The three source-type chip colors come from each
+project's own brand palette so the chip reads as "this came from there", not
+as a Palimpsest choice. The three derived values (`ink`, `ink-muted`,
+`success`) are not in the reference image but were tuned to harmonise with
+it: `ink` is a deep indigo so body text doesn't feel like a foreign black,
+`ink-muted` is a desaturated cool gray, and `success` is a teal-leaning
+green so the verified badge keeps its colour-coded semantic without
+introducing a warm hue.
 
 ### 3.2 Typography
 
@@ -346,7 +361,9 @@ screen-reader narration rehearsal, RTL.
 Pulled directly from the design-skill output and from the EECS-demo failure
 modes we want to dodge:
 
-- AI-purple / pink gradients.
+- Garish gradients of any kind. The palette is purposefully cool and
+  refined; it is applied as flat fills, never as plum→magenta→indigo blends
+  or AI-purple haze.
 - Over-rounded `rounded-2xl` cards.
 - Drop-shadowed cards stacked on a white background.
 - Emoji used as icons.
