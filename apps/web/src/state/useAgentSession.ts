@@ -3,14 +3,20 @@
  *
  * One reducer turns the SSE event stream into a flat `SessionState` that
  * every visual component can read declaratively. The hook owns the
- * EventSource lifecycle: opening on `ask()`, closing on `done`, on error,
- * and on unmount.
+ * AbortController lifecycle: opening on `ask()`, closing on `done`, on
+ * error, and on unmount.
+ *
+ * V1.1 (BYOK): the hook accepts an optional `credentials` argument on
+ * `ask()`. When provided, the credentials are encoded into the
+ * X-LLM-Credentials header by the SSE layer; the hook itself never sees
+ * the raw key beyond passing it through.
  *
  * See `docs/frontend/ui-design-brief.md` §5 for the role of each field.
  */
 
 import { useCallback, useEffect, useReducer, useRef } from "react";
 
+import type { LlmCredentials } from "./llmCredentials";
 import type { SseSession } from "./sse";
 import { openAgentStream } from "./sse";
 import type {
@@ -151,10 +157,34 @@ function reducer(state: SessionState, action: Action): SessionState {
 
 export type UseAgentSession = {
   state: SessionState;
-  ask: (question: string) => void;
+  ask: (question: string, credentials?: LlmCredentials | null) => void;
   cancel: () => void;
   reset: () => void;
 };
+
+/** Map a server error into a single-line user-facing message. */
+function explainServerError(err: unknown): string {
+  if (
+    typeof err === "object" &&
+    err !== null &&
+    "status" in err &&
+    "detail" in err
+  ) {
+    const wrapped = err as { status: number; detail?: unknown };
+    if (wrapped.status === 400 && typeof wrapped.detail === "object" && wrapped.detail !== null) {
+      const detail = wrapped.detail as { detail?: { error?: string } };
+      const code = detail.detail?.error;
+      if (code === "byok_required") {
+        return "Set up an API key in Settings to chat.";
+      }
+      if (code === "invalid_credentials_header" || code === "invalid_credentials_payload") {
+        return "Saved credentials are invalid. Open Settings to update them.";
+      }
+    }
+    return `Server returned ${wrapped.status}.`;
+  }
+  return "Connection lost.";
+}
 
 export function useAgentSession(baseUrl?: string): UseAgentSession {
   const [state, dispatch] = useReducer(reducer, initialState);
@@ -168,7 +198,7 @@ export function useAgentSession(baseUrl?: string): UseAgentSession {
   }, []);
 
   const ask = useCallback(
-    (question: string) => {
+    (question: string, credentials?: LlmCredentials | null) => {
       const trimmed = question.trim();
       if (trimmed.length === 0) return;
       cancel();
@@ -193,11 +223,11 @@ export function useAgentSession(baseUrl?: string): UseAgentSession {
         },
         {
           baseUrl,
-          onError: () => {
-            // EventSource fires `error` when the server closes the stream.
+          credentials: credentials ?? undefined,
+          onError: (err) => {
             // If we already saw `done`, that's a normal close — drop it.
             if (doneRef.current) return;
-            dispatch({ type: "error", message: "Connection lost." });
+            dispatch({ type: "error", message: explainServerError(err) });
             sessionRef.current?.close();
             sessionRef.current = null;
           },

@@ -35,6 +35,14 @@ if (typeof globalThis.localStorage?.clear !== "function") {
   });
 }
 
+if (typeof globalThis.sessionStorage?.clear !== "function") {
+  Object.defineProperty(globalThis, "sessionStorage", {
+    configurable: true,
+    writable: true,
+    value: new MemoryStorage(),
+  });
+}
+
 afterEach(() => {
   cleanup();
 });

@@ -16,11 +16,15 @@ Environment = Literal["development", "staging", "production", "test"]
 
 
 class OpenRouterSettings(BaseSettings):
-    """Cloud LLM backend (OpenRouter)."""
+    """Cloud LLM backend (OpenRouter).
+
+    `api_key` is optional. When omitted, the server runs in BYOK mode and
+    every `/agent/ask` request must carry an `X-LLM-Credentials` header.
+    """
 
     model_config = SettingsConfigDict(env_prefix="OPENROUTER_", extra="ignore")
 
-    api_key: SecretStr = Field(..., description="OpenRouter API key")
+    api_key: SecretStr | None = Field(default=None, description="OpenRouter API key")
     base_url: str = Field(default="https://openrouter.ai/api/v1")
     standard_model: str = Field(default="openai/gpt-5.4-mini")
     complex_model: str = Field(default="openai/gpt-5.4")
@@ -137,6 +141,16 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.api_cors_origins.split(",") if o.strip()]
+
+    @property
+    def byok_required(self) -> bool:
+        """True when no server-side OpenRouter key is configured.
+
+        In BYOK mode, /agent/ask requires an X-LLM-Credentials header and
+        /llm/chat returns 503 directing callers to /agent/ask.
+        """
+        key = self.openrouter.api_key
+        return key is None or key.get_secret_value().strip() == ""
 
 
 @lru_cache(maxsize=1)
