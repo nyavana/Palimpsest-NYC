@@ -161,6 +161,8 @@ Tags: `latest` tracks `main`; semver tags (`v0.1.0`, `0.1`) come from git tags. 
 
 The OpenRouter key is read from your host's `.env` at container start; it never enters the image. The published images have been audited for `.env` files and OpenRouter key signatures and are clean.
 
+> **Note on routing.** `docker-compose.prod.yml` does not currently include the `osrm` / `osrm-prepare` services, so published-image deployments fall back to haversine straight-line walks (the `plan_walk` tool returns `routing_backend="haversine_fallback"`). To get street-following routes in a deployed environment, add the OSRM services or build from source — see [`infra/osrm/README.md`](infra/osrm/README.md). Wiring OSRM into the prod compose is a tracked V2 item.
+
 ## Build from source
 
 If you want to develop against the project rather than just run it, build the stack locally with `make up`. This needs Docker plus `uv` (or Python 3.12 + `venv`) and Node 20+ on the host.
@@ -174,6 +176,17 @@ open http://localhost:5173
 ```
 
 Stop with `make down`, or `make nuke` to drop the volumes too. Schema changes require `make nuke && make up`, because the schema is owned by `apps/api/app/db/migrations/*.sql` and is applied by the postgres entrypoint on first volume init. ORM `create_all` is never used in app code paths.
+
+### Routing graph (OSRM)
+
+The agent's `plan_walk` tool calls an in-network OSRM service for street-following walking routes. Two compose services back this:
+
+- **`osrm-prepare`** — one-shot. On first start it runs `osrm-extract -p foot.lua && osrm-partition && osrm-customize` against the OSM extract at `infra/osrm/extract.osm.pbf` and writes the prepared graph to a named volume. Idempotent: skips on subsequent boots once `extract.osrm.cnbg` is present.
+- **`osrm`** — runtime. Serves `http://osrm:5000` on the compose network using `osrm-routed --algorithm mld` against the prepared graph. The image is pinned to `osrm/osrm-backend:v5.25.0`.
+
+The OSM extract is **not committed** (it's ~100 MB and changes upstream). On a fresh checkout you need to drop a `.osm.pbf` for the V1 bbox at `infra/osrm/extract.osm.pbf` before `make up`. The full refresh procedure (BBBike URL, Geofabrik clip with `osmium`, idempotency rules, expected file sizes, smoke test) is in [`infra/osrm/README.md`](infra/osrm/README.md).
+
+If `osrm` is unreachable at request time, `plan_walk` falls back to a haversine straight-line route with `routing_backend="haversine_fallback"` rather than failing the request — the frontend renders this as a dashed muted path.
 
 ## Try the agent
 
@@ -190,14 +203,14 @@ The SSE stream emits the following frames in order:
 | event | when |
 |---|---|
 | `turn` | each LLM turn boundary |
-| `tool_call` | the agent invokes `search_places` |
-| `tool_result` | matched documents come back from postgres |
+| `tool_call` | the agent invokes `search_places` or `plan_walk` |
+| `tool_result` | matched documents (or a routed walk) come back |
 | `tool_error` | a tool invocation raised; the loop continues with the error fed back to the LLM |
 | `narration` | terminal JSON payload with the prose |
 | `citations` | terminal JSON payload with the cited documents |
 | `warning` | non-fatal verifier warning (e.g. citation retry exhausted with `verified=False`) |
-| `walk` | server-side `plan_walk` over the cited place IDs |
-| `done` | terminal marker after walk planning |
+| `walk` | emitted only when the agent called `plan_walk` (street-following GeoJSON LineString + per-leg turn-by-turn) |
+| `done` | terminal marker |
 
 ## How it works
 
@@ -205,20 +218,20 @@ The agent runs as a streamed multi-turn loop:
 
 1. **Question in.** The user question hits `/agent/ask` over SSE.
 2. **Search.** The agent dispatches `search_places` calls against a postgres+pgvector corpus, blending vector similarity (384-dim `bge-small`) with `pg_trgm` text search.
-3. **Terminate.** Within a hard cap of 6 turns the loop emits a JSON terminal response: `{narration, citations[]}` under a strict five-field contract (`doc_id`, `source_url`, `source_type`, `span`, `retrieval_turn`).
-4. **Verify.** A retrieval ledger checks every citation against documents actually returned in the conversation; one corrective retry on failure.
-5. **Plan walk.** A server-side `plan_walk` step orders the cited place IDs into a route with leg distances.
-6. **Stream to client.** Each stage emits an SSE frame; the React client renders narration and triggers `flyTo` on the map as frames arrive.
+3. **(Optional) Plan a walk.** For tour-style queries the agent calls `plan_walk` against an OSRM-backed routing service to convert cited place IDs into a street-following walking route with per-leg turn-by-turn instructions. A walk-intent classifier nudges the system prompt; the LLM still decides whether to call.
+4. **Terminate.** Within a hard cap of 7 turns the loop emits a JSON terminal response: `{narration, citations[]}` under a strict five-field contract (`doc_id`, `source_url`, `source_type`, `span`, `retrieval_turn`).
+5. **Verify.** A retrieval ledger checks every citation against documents actually returned in the conversation; one corrective retry on failure.
+6. **Stream to client.** Each stage emits an SSE frame; the React client renders narration, triggers `flyTo` as citations arrive, and draws the OSRM walk geometry as a polyline if the agent produced one.
 
-The loop is intentionally narrow: one tool, one terminal response shape, and no branching once citations are verified. That keeps each invariant easy to test in isolation and easy to reason about when something fails.
+The loop is intentionally narrow: two tools, one terminal response shape, and no branching once citations are verified. That keeps each invariant easy to test in isolation and easy to reason about when something fails.
 
-For the architecture diagram and the agent loop deep-dive, see [`docs/project-overview.md`](docs/project-overview.md) and [`docs/agent-2026-04-28.md`](docs/agent-2026-04-28.md).
+For the architecture diagram and the agent loop deep-dive, see [`docs/project-overview.md`](docs/project-overview.md), [`docs/agent-2026-04-28.md`](docs/agent-2026-04-28.md), and [`docs/route-planning-2026-05-04.md`](docs/route-planning-2026-05-04.md).
 
 ## Tech stack
 
 The stack splits into four layers; each was chosen so v2 can swap one piece without touching the others:
 
-- **Backend:** FastAPI · Python 3.12 · async SQLAlchemy + asyncpg · PostgreSQL 16 + PostGIS + pgvector + pg_trgm · Redis.
+- **Backend:** FastAPI · Python 3.12 · async SQLAlchemy + asyncpg · PostgreSQL 16 + PostGIS + pgvector + pg_trgm · Redis · OSRM (foot profile) for street-following walking routes.
 - **Frontend:** React + Vite + TypeScript · MapLibre GL (3D OSM, swap-ready for Google Photorealistic 3D Tiles).
 - **LLM routing:** OpenRouter, behind a two-tier router with circuit breakers; on-device endpoint is a v2 swap-in.
 - **Embeddings:** `BAAI/bge-small-en-v1.5` (CPU, 384-dim singleton on `app.state`).
@@ -253,7 +266,7 @@ V1 ships the smallest end-to-end system that answers a citation-grounded walking
 - FastAPI skeleton + two-tier LLM router with circuit breakers
 - DB schema + embeddings (PostGIS + pgvector + pg_trgm; 384-dim)
 - Wikipedia + OSM ingestion (928 places, 323 documents)
-- Single-tool agent + five-field citation verifier + server-side walk planner
+- Two-tool agent (`search_places`, `plan_walk`) + five-field citation verifier + OSRM-backed routing + walk-intent soft hint
 - SSE endpoint, frontend EventSource consumer, map markers + `flyTo`
 - Per-session telemetry harness for cost / cycle-time / failure-mode analysis
 - Docker images published to ghcr.io on every `main` push and on `v*` tags, pulled by `docker-compose.prod.yml`
