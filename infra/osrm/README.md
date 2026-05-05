@@ -66,7 +66,7 @@ over time as OSM contributors update the map.
 ## OSRM Profile: `foot.lua`
 
 We use OSRM's bundled **`foot.lua`** walking profile (shipped inside the
-`osrm/osrm-backend:v5.27.1` image at `/opt/foot.lua`). This profile:
+`osrm/osrm-backend:v5.25.0` image at `/opt/foot.lua`). This profile:
 
 - Follows pedestrian ways, footpaths, sidewalks, park trails, and
   crossing nodes.
