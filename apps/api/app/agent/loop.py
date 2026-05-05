@@ -1,9 +1,12 @@
-"""Agent loop — single-tool surface, citation-verified, SSE-friendly events.
+"""Agent loop — two-tool surface, citation-verified, SSE-friendly events.
 
-V1 contract (locked):
-  - Exactly one tool registered (`search_places`); other tool calls return
-    an `UnknownToolError` message back to the LLM and the loop continues.
-  - Turn cap = 6. Hitting the cap is a hard failure.
+V1 contract (locked, post-`agent-route-planning`):
+  - Exactly two tools registered (`search_places`, `plan_walk`); other tool
+    calls return an `UnknownToolError` message back to the LLM and the loop
+    continues.
+  - Turn cap = 7 (raised from 6 to absorb the `plan_walk` round-trip while
+    preserving the existing two-turn retry headroom). Hitting the cap is a
+    hard failure.
   - Terminal response is JSON `{narration, citations[]}`. The citation
     verifier rejects responses that violate the contract; the loop retries
     once with a corrective system message, and if the retry also fails the
@@ -11,6 +14,12 @@ V1 contract (locked):
   - The loop also exposes `run_streamed()` which yields `AgentEvent` objects
     suitable for the SSE handler — one event per turn, tool result,
     narration, citation set, and a final `done` marker.
+  - The loop classifies the user query into a `walk_intent_hint`
+    (positive | negative | neutral) and appends a one-line bias to the
+    system prompt accordingly. The hint is a *bias*, never a gate.
+  - The most recent successful `plan_walk` tool result (a dict mirroring the
+    `RouteResult` shape) is captured onto `AgentResult.walk`; earlier calls
+    are silently superseded.
 """
 
 from __future__ import annotations
@@ -31,6 +40,7 @@ from app.agent.citations import (
     parse_narration_response,
     verify_citations,
 )
+from app.agent.intent import classify_walk_intent, intent_note_for
 from app.agent.tools.base import (
     Tool,
     ToolArgError,
@@ -40,7 +50,7 @@ from app.agent.tools.base import (
 )
 from app.llm.models import ChatRequest, ChatResponse, Message, ToolCall
 
-MAX_TURNS_DEFAULT = 6
+MAX_TURNS_DEFAULT = 7
 COMPLEXITY_DEFAULT = "complex"
 
 
@@ -71,6 +81,13 @@ class AgentEvent:
 # ── Result ──────────────────────────────────────────────────────────
 
 
+# `PlannedRoute` is the JSON-serializable dict the `plan_walk` tool emits;
+# see design.md §4 / spec "plan_walk tool output contract" for the shape.
+# A `dict[str, Any]` alias lets the SSE handler JSON-serialize it directly
+# without an additional dataclass mirror.
+PlannedRoute = dict[str, Any]
+
+
 @dataclass(slots=True)
 class AgentResult:
     narration: str
@@ -80,6 +97,8 @@ class AgentResult:
     turns: int
     duration_s: float
     ledger: RetrievalLedger = field(default_factory=RetrievalLedger)
+    walk: PlannedRoute | None = None
+    walk_intent_hint: Literal["positive", "negative", "neutral"] = "neutral"
 
 
 # ── System prompt ───────────────────────────────────────────────────
@@ -88,9 +107,20 @@ class AgentResult:
 _SYSTEM_PROMPT = """\
 You are Palimpsest NYC's walking-tour agent for Morningside Heights and the Upper West Side of Manhattan.
 
-You have ONE tool: `search_places`. You SHOULD call it 1-3 times to gather places, then COMMIT to your final answer.
+Tools you can call:
+  - search_places(query, near?, radius_m?) — required at least once.
+  - plan_walk(place_ids, mode="walking") — OPTIONAL. Call only when:
+      * The user is asking for a tour, route, or directions, AND
+      * You can identify at least 2 distinct places worth visiting.
+    Do NOT call plan_walk for purely informational questions about a single place ("tell me about X"), comparison questions that do not imply visiting ("which is older, X or Y"), or queries the user has not asked for a route on.
 
-You have a hard budget of 6 turns. Plan to finalize by turn 4 at the latest. Excessive searching wastes the user's time.
+You have a hard budget of 7 turns. Plan to finalize by turn 4 at the latest. Excessive searching wastes the user's time.
+
+Workflow:
+  1. Search 1-3 times via search_places to gather candidates.
+  2. Decide whether to call plan_walk based on the rules above.
+  3. If you called plan_walk, the tool result includes `total_distance_m` and `legs[].steps[]`; you MAY mention these in narration but MUST still emit the final JSON {narration, citations[]} with citations drawn from search_places results (NOT plan_walk).
+  4. Emit the final JSON. If you did not call plan_walk, citations alone drive the user-facing response.
 
 When you have enough information (typically after 1-3 search calls), return your FINAL answer as a strict JSON object with exactly two fields:
   - "narration": a concise (4-8 sentences) walking-tour description.
@@ -105,7 +135,7 @@ Each citation MUST have all five fields:
 
 Rules:
   - You MUST call search_places at least once before producing the final JSON.
-  - Every citation MUST reference a doc_id that was actually returned by search_places earlier in this conversation.
+  - Every citation MUST reference a doc_id that was actually returned by search_places earlier in this conversation. plan_walk does NOT contribute new doc_ids to the citation pool — it only routes through doc_ids you already retrieved.
   - Output ONLY the JSON object as your final response — no prose, no markdown fences.
   - Do NOT cite a doc_id you did not retrieve, and do NOT invent doc_ids.
   - If your first 1-2 searches returned good results, STOP searching and emit the final JSON.
@@ -148,8 +178,26 @@ class AgentLoop:
     ) -> AsyncIterator[AgentEvent]:
         t0 = time.perf_counter()
         ledger = RetrievalLedger()
+        # Per-conversation plan_walk capture; most-recent successful call wins.
+        latest_walk: PlannedRoute | None = None
+
+        # Walk-intent classification biases the system prompt at run-time
+        # (depends on the user query, so cannot live at module load). The
+        # tool surface is unchanged regardless of label — the hint is a
+        # *bias*, never a gate.
+        hint = classify_walk_intent(user_query)
+        note = intent_note_for(hint)
+        sys_prompt = _SYSTEM_PROMPT + (f"\n\n{note}" if note else "")
+
+        # The plan_walk tool requires the per-conversation retrieval ledger
+        # to validate that every place_id it's asked to route through was
+        # actually returned by a prior search_places call. The ledger is
+        # owned by this loop, so we mutate it onto the caller's context.
+        # search_places ignores this field, so it's a no-op for that tool.
+        context.retrieval_ledger = ledger
+
         messages: list[Message] = [
-            Message(role="system", content=_SYSTEM_PROMPT),
+            Message(role="system", content=sys_prompt),
             Message(role="user", content=user_query),
         ]
         tools = self._registry.definitions()
@@ -219,7 +267,9 @@ class AgentLoop:
                         "tool_call",
                         {"name": call.name, "arguments": call.arguments},
                     )
-                    msg, hits = await self._dispatch_tool(call, context, turn)
+                    msg, hits, output = await self._dispatch_tool(
+                        call, context, turn
+                    )
                     messages.append(msg)
                     if hits is not None:
                         ledger.add(turn=turn, hits=hits)
@@ -232,6 +282,18 @@ class AgentLoop:
                             "tool_error",
                             {"name": call.name, "message": msg.content},
                         )
+                    # Capture the most-recent successful `plan_walk` tool
+                    # result. Earlier calls are silently superseded
+                    # (design.md §10 — most-recent-wins per conversation).
+                    # Tool errors (envelope with `"error"` key), unknown
+                    # tools, and bad-args paths all set `output=None` and
+                    # do NOT update the captured walk.
+                    if (
+                        call.name == "plan_walk"
+                        and isinstance(output, dict)
+                        and "error" not in output
+                    ):
+                        latest_walk = output
                 continue  # round-trip again so the LLM sees the tool result
 
             # No tool call — assume the LLM is producing a final answer.
@@ -252,6 +314,8 @@ class AgentLoop:
                     turns=turn,
                     duration_s=time.perf_counter() - t0,
                     ledger=ledger,
+                    walk=latest_walk,
+                    walk_intent_hint=hint,
                 )
                 yield AgentEvent("done", {"result": result})
                 return
@@ -286,6 +350,8 @@ class AgentLoop:
                         turns=turn,
                         duration_s=time.perf_counter() - t0,
                         ledger=ledger,
+                        walk=latest_walk,
+                        walk_intent_hint=hint,
                     )
                     yield AgentEvent("done", {"result": result})
                     return
@@ -318,10 +384,17 @@ class AgentLoop:
         call: ToolCall,
         context: ToolExecutionContext,
         turn: int,
-    ) -> tuple[Message, list[dict[str, Any]] | None]:
-        """Run a tool call, return (message-to-append, hits-or-None).
+    ) -> tuple[Message, list[dict[str, Any]] | None, Any | None]:
+        """Run a tool call, return (message-to-append, hits-or-None, output-or-None).
 
         `hits` is None when the call errored — caller emits a tool_error event.
+        `output` is the parsed tool return value (typically a dict). It is
+        `None` when the tool name was unknown or raised an exception (the
+        caller would have nothing structurally useful to capture). For tools
+        that returned a structured *error envelope* (e.g.
+        ``{"error": "unknown_place_id", ...}``) the envelope IS surfaced via
+        `output` even though `hits` is also None — the caller distinguishes
+        success from envelope-error via the dict's `"error"` key.
         """
         try:
             tool = self._registry.get(call.name)
@@ -336,11 +409,12 @@ class AgentLoop:
                             "error": "unknown_tool",
                             "message": (
                                 f"Tool {call.name!r} is not in the V1 surface. "
-                                f"Only `search_places` is available."
+                                f"Available tools: `search_places`, `plan_walk`."
                             ),
                         }
                     ),
                 ),
+                None,
                 None,
             )
 
@@ -355,6 +429,7 @@ class AgentLoop:
                     content=json.dumps({"error": "bad_args", "message": str(exc)}),
                 ),
                 None,
+                None,
             )
         except Exception as exc:  # noqa: BLE001
             return (
@@ -364,6 +439,7 @@ class AgentLoop:
                     tool_call_id=call.id,
                     content=json.dumps({"error": "internal", "message": str(exc)}),
                 ),
+                None,
                 None,
             )
 
@@ -379,6 +455,7 @@ class AgentLoop:
                 content=json.dumps(output, default=str),
             ),
             hits,
+            output,
         )
 
 

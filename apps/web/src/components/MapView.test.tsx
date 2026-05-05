@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, act } from "@testing-library/react";
+import { render, act, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { MapView } from "./MapView";
 import { MapEngineProvider } from "@/state/MapEngineContext";
-import type { Citation, PlannedStop } from "@/state/types";
+import type { Citation, PlannedRoute } from "@/state/types";
 
-// Mocked engine — lets tests drive marker events and assert flyTo calls.
+// Mocked engine — lets tests drive marker events and assert flyTo / addPath calls.
 type Cb = (...args: unknown[]) => void;
 const fakeEngine = {
   hoverCb: null as Cb | null,
@@ -58,14 +58,70 @@ vi.mock("@/state/useWikipediaSummary", () => ({
   useWikipediaSummary: () => ({ status: "idle" as const }),
 }));
 
-const stops: PlannedStop[] = [
-  { index: 0, doc_id: "wikipedia:Low_Memorial_Library", name: "Low Memorial Library", lat: 40.808, lon: -73.961 },
-  { index: 1, doc_id: "wikipedia:Cathedral_of_St._John_the_Divine", name: "Cathedral of St. John the Divine", lat: 40.804, lon: -73.96 },
-];
+const walk: PlannedRoute = {
+  stops: [
+    {
+      index: 0,
+      doc_id: "wikipedia:Low_Memorial_Library",
+      name: "Low Memorial Library",
+      lat: 40.808,
+      lon: -73.961,
+    },
+    {
+      index: 1,
+      doc_id: "wikipedia:Cathedral_of_St._John_the_Divine",
+      name: "Cathedral of St. John the Divine",
+      lat: 40.804,
+      lon: -73.96,
+    },
+  ],
+};
 
 const citations: Citation[] = [
-  { doc_id: stops[0].doc_id, source_url: "https://en.wikipedia.org/wiki/Low_Memorial_Library", source_type: "wikipedia", span: "An iconic library.", retrieval_turn: 1 },
+  {
+    doc_id: walk.stops[0].doc_id,
+    source_url: "https://en.wikipedia.org/wiki/Low_Memorial_Library",
+    source_type: "wikipedia",
+    span: "An iconic library.",
+    retrieval_turn: 1,
+  },
 ];
+
+const ROUTED_WALK: PlannedRoute = {
+  stops: [
+    { index: 0, doc_id: "wikipedia:A", name: "A", lat: 40.804, lon: -73.962 },
+    { index: 1, doc_id: "wikipedia:B", name: "B", lat: 40.811, lon: -73.962 },
+  ],
+  legs: [
+    {
+      from_index: 0,
+      to_index: 1,
+      distance_m: 412,
+      duration_s: 295,
+      geometry: {
+        type: "LineString",
+        coordinates: [
+          [-73.962, 40.804],
+          [-73.961, 40.808],
+          [-73.962, 40.811],
+        ],
+      },
+      steps: [],
+    },
+  ],
+  geometry: {
+    type: "LineString",
+    coordinates: [
+      [-73.962, 40.804],
+      [-73.961, 40.808],
+      [-73.962, 40.811],
+    ],
+  },
+  total_distance_m: 412,
+  total_duration_s: 295,
+  routing_backend: "osrm",
+  stop_ordering: "input_order",
+};
 
 beforeEach(() => {
   // The global setup file runs `vi.restoreAllMocks()` which wipes out
@@ -101,7 +157,7 @@ beforeEach(() => {
   fakeEngine.clickCb = null;
 });
 
-async function renderMap(props: { stops: PlannedStop[]; citations: Citation[] }) {
+async function renderMap(props: { walk: PlannedRoute | null; citations: Citation[] }) {
   const utils = render(
     <MapEngineProvider>
       <MapView {...props} />
@@ -117,7 +173,7 @@ async function renderMap(props: { stops: PlannedStop[]; citations: Citation[] })
 
 describe("MapView popup", () => {
   it("on hover, mounts a popup; on leave, clears it", async () => {
-    await renderMap({ stops, citations });
+    await renderMap({ walk, citations });
     expect(fakeEngine.hoverCb).not.toBeNull();
 
     act(() => {
@@ -132,7 +188,7 @@ describe("MapView popup", () => {
   });
 
   it("on click, pins the popup and flies to the stop", async () => {
-    await renderMap({ stops, citations });
+    await renderMap({ walk, citations });
 
     act(() => {
       fakeEngine.clickCb!({ layerId: "walk", markerId: "stop-0", at: { lat: 40.808, lng: -73.961 } });
@@ -147,7 +203,7 @@ describe("MapView popup", () => {
   });
 
   it("Escape clears a pinned popup", async () => {
-    await renderMap({ stops, citations });
+    await renderMap({ walk, citations });
 
     act(() => {
       fakeEngine.clickCb!({ layerId: "walk", markerId: "stop-0", at: { lat: 40.808, lng: -73.961 } });
@@ -157,8 +213,8 @@ describe("MapView popup", () => {
     expect(fakeEngine.clearPopup).toHaveBeenCalled();
   });
 
-  it("clears popup state when stops change", async () => {
-    const { rerender } = await renderMap({ stops, citations });
+  it("clears popup state when the walk changes", async () => {
+    const { rerender } = await renderMap({ walk, citations });
 
     act(() => {
       fakeEngine.clickCb!({ layerId: "walk", markerId: "stop-0", at: { lat: 40.808, lng: -73.961 } });
@@ -166,10 +222,74 @@ describe("MapView popup", () => {
 
     rerender(
       <MapEngineProvider>
-        <MapView stops={[]} citations={[]} />
+        <MapView walk={null} citations={[]} />
       </MapEngineProvider>,
     );
 
     expect(fakeEngine.clearPopup).toHaveBeenCalled();
+  });
+});
+
+// MapView contract: when a walk frame carries a GeoJSON LineString, MapView
+// passes its coords (after `[lon, lat] → {lat, lng}` conversion) directly
+// into `engine.addPath("walk", coords)`. There is no decoder helper.
+//
+// Spec: `agent-route-planning` §map-engine ADDED requirement "Walk frame
+// consumer renders LineString geometry + steps", scenario "Walk frame with
+// GeoJSON LineString renders street-following path".
+describe("MapView path drawing", () => {
+  it("feeds walk.geometry.coordinates into engine.addPath after lon/lat → lat/lng swap", async () => {
+    await renderMap({ walk: ROUTED_WALK, citations: [] });
+
+    await waitFor(() => {
+      expect(fakeEngine.addPath).toHaveBeenCalledWith(
+        "walk",
+        // RFC 7946 [lon, lat] → engine {lat, lng}
+        [
+          { lat: 40.804, lng: -73.962 },
+          { lat: 40.808, lng: -73.961 },
+          { lat: 40.811, lng: -73.962 },
+        ],
+        expect.objectContaining({ widthPx: 4 }),
+      );
+    });
+  });
+
+  it("falls back to straight-line stop coords when walk.geometry is absent (legacy V1)", async () => {
+    const legacy: PlannedRoute = { stops: ROUTED_WALK.stops };
+    await renderMap({ walk: legacy, citations: [] });
+
+    await waitFor(() => {
+      expect(fakeEngine.addPath).toHaveBeenCalledWith(
+        "walk",
+        [
+          { lat: 40.804, lng: -73.962 },
+          { lat: 40.811, lng: -73.962 },
+        ],
+        expect.any(Object),
+      );
+    });
+  });
+
+  it("renders haversine-fallback paths with a dashed/muted style", async () => {
+    await renderMap({
+      walk: { ...ROUTED_WALK, routing_backend: "haversine_fallback" },
+      citations: [],
+    });
+
+    await waitFor(() => {
+      const lastCall = fakeEngine.addPath.mock.calls.at(-1)!;
+      const style = lastCall[2] as { dashed?: boolean };
+      expect(style.dashed).toBe(true);
+    });
+  });
+
+  it("clears the walk layer when walk is null", async () => {
+    await renderMap({ walk: null, citations: [] });
+
+    await waitFor(() => {
+      expect(fakeEngine.clearLayer).toHaveBeenCalledWith("walk");
+    });
+    expect(fakeEngine.addPath).not.toHaveBeenCalled();
   });
 });

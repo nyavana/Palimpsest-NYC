@@ -131,3 +131,30 @@ spec-validate: ## Validate all openspec changes
 .PHONY: spec-show
 spec-show: ## Show active change summary
 	@openspec show initial-palimpsest-scaffold
+
+# ─────────────────────────────── osrm ───────────────────────────────
+
+OSRM_BBOX := -74.000,40.795,-73.955,40.825
+OSRM_EXTRACT := infra/osrm/extract.osm.pbf
+BBBIKE_URL := https://extract.bbbike.org/?sw_lng=-74.000&sw_lat=40.795&ne_lng=-73.955&ne_lat=40.825&format=osm.pbf&city=MorningsideHeights-UWS
+
+.PHONY: extract
+extract: ## Print the BBBike URL and curl command to download the OSM extract
+	@echo ""
+	@echo "=== OSM Extract Download ==="
+	@echo ""
+	@echo "1. Open this URL in your browser to request the extract from BBBike:"
+	@echo "   $(BBBIKE_URL)"
+	@echo ""
+	@echo "   BBBike will email you a download link (~3-8 MB .osm.pbf)."
+	@echo ""
+	@echo "2. Once you have the download URL from the email, run:"
+	@echo "   curl -L <DOWNLOAD_URL> -o $(OSRM_EXTRACT)"
+	@echo ""
+	@echo "   Or (Geofabrik + osmium alternative — requires osmium-tool installed):"
+	@echo "   curl -L https://download.geofabrik.de/north-america/us/new-york-latest.osm.pbf -o /tmp/ny.osm.pbf"
+	@echo "   osmium extract --bbox $(OSRM_BBOX) /tmp/ny.osm.pbf -o $(OSRM_EXTRACT)"
+	@echo ""
+	@echo "3. Then run:  make up"
+	@echo "   osrm-prepare will preprocess the extract (~2 min on first run)."
+	@echo ""

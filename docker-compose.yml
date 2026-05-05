@@ -124,6 +124,61 @@ services:
       - api
     restart: unless-stopped
 
+  # ── OSRM routing backend ─────────────────────────────────────────────
+  #
+  # osrm-prepare: one-shot init container that preprocesses the OSM extract
+  # into the MLD routing graph. Idempotent — exits 0 immediately if the
+  # final output file (extract.osrm.cnbg) is already present on the volume.
+  #
+  # osrm: runtime routing server. Starts only after osrm-prepare exits 0.
+  # Serves on port 5000; the api container uses OSRM_BASE_URL=http://osrm:5000.
+  #
+  # Both services share the osrm-data named volume. osrm-prepare writes to it;
+  # osrm mounts it read-only at runtime.
+  #
+  # Prerequisites: infra/osrm/extract.osm.pbf must exist (see infra/osrm/README.md
+  # and `make extract`). The file is gitignored — drop it in place before `make up`.
+
+  osrm-prepare:
+    image: osrm/osrm-backend:v5.25.0
+    container_name: palimpsest-osrm-prepare
+    command:
+      - bash
+      - -c
+      - |
+        if [ -f /data/extract.osrm.cnbg ]; then
+          echo "OSRM data already prepared — skipping preprocessing."
+          exit 0
+        fi
+        echo "Running osrm-extract with foot profile..."
+        osrm-extract -p /opt/foot.lua /data/extract.osm.pbf
+        echo "Running osrm-partition..."
+        osrm-partition /data/extract.osrm
+        echo "Running osrm-customize..."
+        osrm-customize /data/extract.osrm
+        echo "OSRM preprocessing complete."
+    volumes:
+      - ./infra/osrm/extract.osm.pbf:/data/extract.osm.pbf:ro
+      - osrm-data:/data
+    restart: "no"
+
+  osrm:
+    image: osrm/osrm-backend:v5.25.0
+    container_name: palimpsest-osrm
+    command:
+      - osrm-routed
+      - --algorithm
+      - mld
+      - /data/extract.osrm
+    volumes:
+      - osrm-data:/data:ro
+    ports:
+      - "5000:5000"
+    depends_on:
+      osrm-prepare:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
 volumes:
   postgres-data:
     name: palimpsest-postgres-data
@@ -131,6 +186,8 @@ volumes:
     name: palimpsest-redis-data
   hf-cache:
     name: palimpsest-hf-cache
+  osrm-data:
+    name: palimpsest-osrm-data
 
 networks:
   default:

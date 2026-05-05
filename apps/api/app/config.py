@@ -124,6 +124,8 @@ class Settings(BaseSettings):
 
     redis_url: str = Field(default="redis://redis:6379/0", alias="REDIS_URL")
 
+    osrm_base_url: str = Field(default="http://osrm:5000", alias="OSRM_BASE_URL")
+
     openrouter: OpenRouterSettings = Field(default_factory=OpenRouterSettings)  # type: ignore[arg-type]
     local_llm: LocalLLMSettings = Field(default_factory=LocalLLMSettings)
     embeddings: EmbeddingsSettings = Field(default_factory=EmbeddingsSettings)

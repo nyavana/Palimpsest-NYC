@@ -1,10 +1,23 @@
 /**
- * MapView — mounts a MapEngine on a div, draws the walk, and hosts the
- * marker info popups + the 2D/3D toggle overlay.
+ * MapView — mounts a MapEngine on a div, draws the walk (path + markers),
+ * and hosts the marker info popups + the 2D/3D toggle overlay.
  *
- * The popup element is React-owned (a stable div referenced via useRef),
- * mounted into the engine's popup container by `engine.setPopup(at, el)`.
- * React renders MarkerInfoCard into that element via createPortal.
+ * Popups: the host element is React-owned (a stable div referenced via
+ * useRef), mounted into the engine's popup container by `engine.setPopup`.
+ * React renders MarkerInfoCard into that host via createPortal.
+ *
+ * Walk drawing: when `walk` changes, we replace the `walk` layer through the
+ * engine interface. No `maplibre-gl` imports — the eslint rule blocks that
+ * for everything outside `@/map/engines/`.
+ *
+ * Path source of truth, in priority order:
+ *   1. `walk.geometry.coordinates` (the OSRM-routed LineString) — the only
+ *      vertex-by-vertex source per `agent-route-planning` spec §map-engine.
+ *   2. Otherwise, fall back to the stop coordinates as a straight-line draft
+ *      (legacy V1 walks that don't carry `geometry`).
+ *
+ * No polyline decoder. GeoJSON LineString feeds the engine's geojson source
+ * natively; we only need to swap `[lon, lat] → {lat, lng}` shape.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -12,7 +25,8 @@ import { createPortal } from "react-dom";
 
 import { DEFAULT_VIEWPORT, createMapEngine, type MapEngine } from "@/map";
 import type { LatLng, MarkerEvent, Viewport } from "@/map";
-import type { Citation, GeoJsonLineString, PlannedStop } from "@/state/types";
+import type { PathStyle } from "@/map/types";
+import type { Citation, PlannedRoute } from "@/state/types";
 import { useMapEngineHandle } from "@/state/MapEngineContext";
 
 import { MarkerInfoCard } from "./MarkerInfoCard";
@@ -24,20 +38,16 @@ import {
 } from "./MapViewModeToggle";
 
 const WALK_LAYER = "walk";
-const PATH_COLOR = "#7a1f1f";
+const PATH_COLOR = "#7a1f1f"; // tokens.palette.oxblood
+const FALLBACK_PATH_COLOR = "#6f6a5f"; // tokens.palette["ink-muted"]
 const MARKER_COLOR = "#7a1f1f";
 const FLYTO_DURATION_MS = 1200;
 const TOGGLE_FLY_MS = 600;
 const PINNED_FLY_MIN_ZOOM = 17.5;
 
 type Props = {
-  stops: PlannedStop[];
+  walk: PlannedRoute | null;
   citations: Citation[];
-  /**
-   * Routed polyline (OSRM/walking-net) for the path. When present, drawn
-   * as the walk path instead of straight-line segments through stops.
-   */
-  geometry?: GeoJsonLineString | null;
 };
 
 type MarkerFocus =
@@ -56,7 +66,21 @@ function parseStopIndex(markerId: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export function MapView({ stops, citations, geometry = null }: Props) {
+/**
+ * Convert an OSRM/GeoJSON `[lon, lat][]` array to the engine-facing
+ * `{lat, lng}[]`. RFC 7946 LineString is `[longitude, latitude]`; the engine
+ * speaks `{lat, lng}`. Centralized here so the swap is a one-liner.
+ */
+function geojsonCoordsToLatLng(coords: [number, number][]): LatLng[] {
+  return coords.map(([lng, lat]) => ({ lat, lng }));
+}
+
+/** Stops as a `LatLng[]` for the legacy straight-line fallback path. */
+function stopsToLatLng(walk: PlannedRoute): LatLng[] {
+  return walk.stops.map((s) => ({ lat: s.lat, lng: s.lon }));
+}
+
+export function MapView({ walk, citations }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const popupHostRef = useRef<HTMLDivElement | null>(null);
   const cameraRef = useRef<Viewport>({ ...DEFAULT_VIEWPORT });
@@ -179,32 +203,43 @@ export function MapView({ stops, citations, geometry = null }: Props) {
     engine.setPopup(focus.at, host);
   }, [ready, focus]);
 
-  // Reset focus and clear popup whenever stops change.
+  // Reset focus and clear popup whenever the walk changes.
   useEffect(() => {
     setFocus({ kind: "idle" });
-  }, [stops]);
+  }, [walk]);
 
-  // Draw the walk.
+  // Draw / clear the walk layer whenever the walk frame changes.
   useEffect(() => {
     if (!ready) return;
     const engine = engineRef.current;
     if (engine === null) return;
 
-    if (stops.length === 0) {
+    if (walk === null || walk.stops.length === 0) {
       engine.clearLayer(WALK_LAYER);
       return;
     }
 
-    // Prefer the routed geometry (street-following polyline) when the API
-    // provides it; fall back to straight-line segments through the stops.
+    // Prefer the routed GeoJSON LineString when present; fall back to a
+    // straight line through stops for legacy V1 frames without geometry.
     const pathCoords: LatLng[] =
-      geometry && geometry.coordinates.length >= 2
-        ? geometry.coordinates.map(([lng, lat]) => ({ lat, lng }))
-        : stops.map((s) => ({ lat: s.lat, lng: s.lon }));
-    engine.addPath(WALK_LAYER, pathCoords, { color: PATH_COLOR, widthPx: 4, opacity: 0.85 });
+      walk.geometry !== undefined && walk.geometry.coordinates.length >= 2
+        ? geojsonCoordsToLatLng(walk.geometry.coordinates)
+        : stopsToLatLng(walk);
+
+    // Subtle visual signal when the routing engine fell back to haversine —
+    // a thoughtful reviewer can tell the path is a draft, not a real route.
+    const degraded = walk.routing_backend === "haversine_fallback";
+    const pathStyle: PathStyle = {
+      color: degraded ? FALLBACK_PATH_COLOR : PATH_COLOR,
+      widthPx: 4,
+      opacity: degraded ? 0.7 : 0.85,
+      dashed: degraded,
+    };
+
+    engine.addPath(WALK_LAYER, pathCoords, pathStyle);
     engine.addMarkers(
       WALK_LAYER,
-      stops.map((s) => ({
+      walk.stops.map((s) => ({
         id: `stop-${s.index}`,
         position: { lat: s.lat, lng: s.lon },
         label: `${s.index + 1}. ${s.name}`,
@@ -212,14 +247,16 @@ export function MapView({ stops, citations, geometry = null }: Props) {
       })),
     );
 
-    const first = stops[0];
+    // Frame the walk: fly to the first stop with the active tour pitch.
+    // Per-stop fly-to from the timeline takes over once the user navigates.
+    const first = walk.stops[0];
     if (first) {
       void engine.flyTo(
         { center: { lat: first.lat, lng: first.lon }, zoom: 15.5, pitch: pitchForMode(viewMode) },
         FLYTO_DURATION_MS,
       );
     }
-  }, [stops, geometry, ready, viewMode]);
+  }, [walk, ready, viewMode]);
 
   const handleViewModeChange = (next: MapViewMode) => {
     setViewMode(next);
@@ -237,7 +274,9 @@ export function MapView({ stops, citations, geometry = null }: Props) {
   const focusedStopIndex =
     focus.kind === "idle" ? null : parseStopIndex(focus.markerId);
   const focusedStop =
-    focusedStopIndex === null ? null : stops.find((s) => s.index === focusedStopIndex) ?? null;
+    focusedStopIndex === null
+      ? null
+      : walk?.stops.find((s) => s.index === focusedStopIndex) ?? null;
   const focusedCitation =
     focusedStop === null ? null : citationByDocId.get(focusedStop.doc_id) ?? null;
 

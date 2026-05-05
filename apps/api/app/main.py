@@ -16,6 +16,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app import __version__
 from app.agent.loop import AgentLoop
 from app.agent.tools.base import ToolRegistry
+from app.agent.tools.plan_walk import PlanWalkTool
 from app.agent.tools.search_places import SearchPlacesTool
 from app.config import Settings, get_settings
 from app.db.engine import build_engine, build_session_factory
@@ -25,6 +26,7 @@ from app.llm.router import build_llm_router
 from app.llm.telemetry import TelemetrySink
 from app.logging import configure_logging, get_logger
 from app.routes import agent, health, llm, meta
+from app.routing import OsrmBackend
 
 log = get_logger(__name__)
 
@@ -91,9 +93,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.embedder = build_embedder(settings.embeddings)
     log.info("embedder.ready", dim=app.state.embedder.dim)
 
-    # Agent surface — V1 contract: exactly one tool registered (search_places)
+    # Routing backend (V1 = OSRM in-cluster). The backend opens a fresh
+    # httpx.AsyncClient per `route()` call so there is no connection pool
+    # to dispose on shutdown.
+    app.state.routing_backend = OsrmBackend(base_url=settings.osrm_base_url)
+    log.info("routing_backend.ready", base_url=settings.osrm_base_url)
+
+    # Agent surface — V1 (route-planning amendment): two tools, search_places
+    # and plan_walk. `plan_walk` reads `routing_backend` and `retrieval_ledger`
+    # from its `ToolExecutionContext`. The routing_backend is process-wide and
+    # is wired into the context in apps/api/app/routes/agent.py (Wave 4); the
+    # retrieval_ledger is per-conversation and is attached to the context by
+    # the agent loop before each tool dispatch (Wave 3). This file only
+    # registers the tool — the context plumbing lives where the context is
+    # constructed.
+    # TODO(wave-4): once routes/agent.py builds ToolExecutionContext with
+    #   routing_backend=app.state.routing_backend, this comment can be deleted.
     tool_registry = ToolRegistry()
     tool_registry.register(SearchPlacesTool())
+    tool_registry.register(PlanWalkTool())
     app.state.agent_tool_registry = tool_registry
     app.state.agent_loop_builder = lambda _request: AgentLoop(
         router=app.state.llm_router,
