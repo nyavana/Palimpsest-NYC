@@ -73,7 +73,6 @@ function getOrFetch(docId: string, slug: string): Promise<WikipediaSummary> {
     cache.delete(docId);
     if (!warned.has(docId)) {
       warned.add(docId);
-      // eslint-disable-next-line no-console
       console.warn(`[wikipedia-summary] failed for ${docId}:`, err);
     }
     throw err;
