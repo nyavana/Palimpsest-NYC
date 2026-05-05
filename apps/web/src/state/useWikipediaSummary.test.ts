@@ -104,4 +104,70 @@ describe("useWikipediaSummary", () => {
     if (result.current.status !== "success") throw new Error("type narrow");
     expect(result.current.summary.thumbnailUrl).toBeNull();
   });
+
+  it("does not write stale data when docId changes mid-fetch", async () => {
+    // First fetch is slow; second resolves immediately.
+    const slowResolve = (() => {
+      let resolveFn: (v: Response) => void = () => {};
+      const promise = new Promise<Response>((r) => {
+        resolveFn = r;
+      });
+      return { promise, resolve: resolveFn };
+    })();
+
+    const fastBody = {
+      title: "B",
+      extract: "Bbb",
+      content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/B" } },
+    };
+
+    let firstCall = true;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(() => {
+        if (firstCall) {
+          firstCall = false;
+          return slowResolve.promise;
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(fastBody),
+        } as unknown as Response);
+      }),
+    );
+
+    const { result, rerender } = renderHook(({ docId }) => useWikipediaSummary(docId), {
+      initialProps: { docId: "wikipedia:A" as string | null },
+    });
+
+    expect(result.current.status).toBe("loading");
+
+    // Re-render with a different docId. The first fetch is still in-flight.
+    rerender({ docId: "wikipedia:B" });
+
+    // Wait for B to resolve.
+    await waitFor(() => expect(result.current.status).toBe("success"));
+    if (result.current.status !== "success") throw new Error("type narrow");
+    expect(result.current.summary.title).toBe("B");
+
+    // Now resolve the original (A) fetch — it must NOT overwrite B.
+    slowResolve.resolve({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({
+        title: "A",
+        extract: "Aaa",
+        content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/A" } },
+      }),
+    } as unknown as Response);
+
+    // Give the microtask a chance to flush.
+    await new Promise((r) => setTimeout(r, 0));
+
+    // State should still reflect B, not A.
+    expect(result.current.status).toBe("success");
+    if (result.current.status !== "success") throw new Error("type narrow");
+    expect(result.current.summary.title).toBe("B");
+  });
 });

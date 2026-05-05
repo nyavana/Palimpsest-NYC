@@ -117,6 +117,11 @@ Pitch is preserved so 2D-mode users don't get tilted unexpectedly.
 - Clicking another marker (transitions, doesn't dismiss).
 - Map background click is *not* a dismiss surface in v1 — pan/zoom should not accidentally close a card the user is reading.
 
+**Accessibility notes (deviations from this spec, settled during implementation):**
+
+- The Wikipedia thumbnail uses `alt={summary.title}` rather than the originally-specified `alt=""`, because the image carries content (the place the popup is about) rather than decoration. This also keeps the image discoverable via assistive tech and via `getByRole("img")` in tests.
+- The pinned-loading skeleton is an inlined 3-bar component with `aria-label="Loading Wikipedia summary"`, not the shared `LoadingSkeleton` used elsewhere — that shared component has `aria-label="Generating narration"`, which is the wrong label in this context. Both skeletons share the same Tailwind classes.
+
 ## 6. Wikipedia summary fetch
 
 New hook in `apps/web/src/state/useWikipediaSummary.ts`:

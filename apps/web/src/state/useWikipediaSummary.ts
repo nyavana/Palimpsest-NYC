@@ -8,7 +8,7 @@
  * The endpoint is the public Wikipedia REST summary API; no key required.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 const PREFIX = "wikipedia:";
 const ENDPOINT = "https://en.wikipedia.org/api/rest_v1/page/summary";
@@ -83,10 +83,9 @@ function getOrFetch(docId: string, slug: string): Promise<WikipediaSummary> {
 
 export function useWikipediaSummary(docId: string | null): WikipediaFetchState {
   const [state, setState] = useState<WikipediaFetchState>({ status: "idle" });
-  const abortedRef = useRef(false);
 
   useEffect(() => {
-    abortedRef.current = false;
+    let cancelled = false;
     const slug = slugFromDocId(docId);
     if (slug === null || docId === null) {
       setState({ status: "idle" });
@@ -96,17 +95,17 @@ export function useWikipediaSummary(docId: string | null): WikipediaFetchState {
     setState({ status: "loading" });
     getOrFetch(docId, slug).then(
       (summary) => {
-        if (abortedRef.current) return;
+        if (cancelled) return;
         setState({ status: "success", summary });
       },
       () => {
-        if (abortedRef.current) return;
+        if (cancelled) return;
         setState({ status: "error" });
       },
     );
 
     return () => {
-      abortedRef.current = true;
+      cancelled = true;
     };
   }, [docId]);
 

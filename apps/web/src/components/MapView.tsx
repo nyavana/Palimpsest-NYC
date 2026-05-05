@@ -99,7 +99,6 @@ export function MapView({ stops, citations }: Props) {
         setReady(true);
       })
       .catch((err) => {
-        // eslint-disable-next-line no-console
         console.error("map init failed", err);
       });
 
@@ -235,7 +234,7 @@ export function MapView({ stops, citations }: Props) {
   return (
     <>
       <div ref={containerRef} className="absolute inset-0" />
-      <div className="pointer-events-none absolute left-4 top-20 z-10">
+      <div className="pointer-events-none absolute left-4 top-24 z-10">
         <div className="pointer-events-auto">
           <MapViewModeToggle mode={viewMode} onChange={handleViewModeChange} />
         </div>
