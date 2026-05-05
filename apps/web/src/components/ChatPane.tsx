@@ -41,7 +41,7 @@ export function ChatPane({ session }: Props) {
           walk={state.walk}
           verified={state.result?.verified ?? null}
         />
-        <WalkTimeline stops={state.walk} />
+        <WalkTimeline stops={state.walk} legs={state.walkLegs} />
       </div>
 
       <Composer busy={busy} onAsk={ask} onCancel={cancel} />

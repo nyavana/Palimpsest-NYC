@@ -13,7 +13,7 @@ import type { MapEngineKind } from "./types";
 
 export type { MapEngine } from "./MapEngine";
 export { MapEngineLifecycleError, NotImplementedError } from "./MapEngine";
-export type { LatLng, MapEngineKind, Marker, PathStyle, Unsubscribe, Viewport } from "./types";
+export type { LatLng, MapEngineKind, Marker, MarkerEvent, PathStyle, Unsubscribe, Viewport } from "./types";
 
 /** Default view for v1 — roughly centered on Low Steps, Columbia. */
 export const DEFAULT_VIEWPORT = {

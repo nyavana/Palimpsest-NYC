@@ -12,7 +12,7 @@
  * See `specs/map-engine/spec.md` for the full behavioral contract.
  */
 
-import type { LatLng, Marker, PathStyle, Unsubscribe, Viewport } from "./types";
+import type { LatLng, Marker, MarkerEvent, PathStyle, Unsubscribe, Viewport } from "./types";
 
 export interface MapEngine {
   /**
@@ -34,6 +34,27 @@ export interface MapEngine {
 
   /** Remove everything on a layer. No-op if the layer does not exist. */
   clearLayer(layerId: string): void;
+
+  /**
+   * Subscribe to marker hover. The callback fires with the currently-hovered
+   * marker, or `null` when no marker is hovered. Implementations debounce so
+   * a single hover-leave/hover-enter pair across two markers emits two
+   * events, not three.
+   */
+  onMarkerHover(cb: (e: MarkerEvent | null) => void): Unsubscribe;
+
+  /** Subscribe to marker clicks. */
+  onMarkerClick(cb: (e: MarkerEvent) => void): Unsubscribe;
+
+  /**
+   * Show a popup at `at` using `el` as the popup content. Replaces any
+   * prior popup. The element is positioned by the underlying map and
+   * follows pan/zoom/rotate.
+   */
+  setPopup(at: LatLng, el: HTMLElement, opts?: { offsetPx?: number }): void;
+
+  /** Hide the popup if any. Idempotent. */
+  clearPopup(): void;
 
   /** Subscribe to camera movements. Returns an unsubscribe function. */
   onCameraChange(cb: (v: Viewport) => void): Unsubscribe;

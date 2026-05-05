@@ -27,6 +27,15 @@ export default [
         process: "readonly",
         HTMLElement: "readonly",
         HTMLDivElement: "readonly",
+        // vitest globals (test files only — see file-specific override below)
+        describe: "readonly",
+        it: "readonly",
+        expect: "readonly",
+        vi: "readonly",
+        beforeEach: "readonly",
+        afterEach: "readonly",
+        beforeAll: "readonly",
+        afterAll: "readonly",
       },
     },
     plugins: {
@@ -37,6 +46,12 @@ export default [
     rules: {
       ...tseslint.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
+      // Honor the `_` convention for intentionally unused params/vars (used
+      // throughout the GoogleTilesEngine stub and other placeholder shims).
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
       "react-refresh/only-export-components": [
         "warn",
         { allowConstantExport: true },

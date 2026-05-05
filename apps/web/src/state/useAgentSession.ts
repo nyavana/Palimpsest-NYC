@@ -16,8 +16,10 @@ import { openAgentStream } from "./sse";
 import type {
   AgentResultPayload,
   Citation,
+  GeoJsonLineString,
   PlannedStop,
   SsePayloads,
+  WalkLeg,
 } from "./types";
 
 export type SessionStatus = "idle" | "asking" | "streaming" | "done" | "error";
@@ -30,6 +32,8 @@ export type SessionState = {
   narration: string;
   citations: Citation[];
   walk: PlannedStop[];
+  walkLegs: WalkLeg[];
+  walkGeometry: GeoJsonLineString | null;
   warnings: string[];
   result: AgentResultPayload | null;
 };
@@ -42,6 +46,8 @@ const initialState: SessionState = {
   narration: "",
   citations: [],
   walk: [],
+  walkLegs: [],
+  walkGeometry: null,
   warnings: [],
   result: null,
 };
@@ -101,6 +107,8 @@ function reducer(state: SessionState, action: Action): SessionState {
         ...state,
         status: "streaming",
         walk: action.payload.stops,
+        walkLegs: action.payload.legs ?? [],
+        walkGeometry: action.payload.geometry ?? null,
       };
     case "warning":
       return {

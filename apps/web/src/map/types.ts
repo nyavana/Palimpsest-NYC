@@ -28,6 +28,13 @@ export type Marker = {
   color?: string;
 };
 
+/** Emitted by `MapEngine.onMarkerHover` and `onMarkerClick`. */
+export type MarkerEvent = {
+  layerId: string;
+  markerId: string;
+  at: LatLng;
+};
+
 export type PathStyle = {
   color?: string;
   widthPx?: number;
