@@ -40,7 +40,6 @@ _FOOT_TRIP_PATH = "/trip/v1/foot/{coords}"
 
 _MAX_STOPS = 8
 _MIN_STOPS = 2
-_SNAP_RADIUS_M = 50
 
 # HTTP status threshold above which we surface a synthetic
 # `upstream_5xx` RoutingBackendError rather than parsing the body.
@@ -71,11 +70,6 @@ def _format_coords(stops: list[Coordinate]) -> str:
     convention). Our input `Coordinate` is `(lat, lon)`, so we swap.
     """
     return ";".join(f"{lon},{lat}" for (lat, lon) in stops)
-
-
-def _build_radiuses(n_stops: int) -> str:
-    """`radiuses=50;50;50;...` capped at the snap-distance the spec wants."""
-    return ";".join([str(_SNAP_RADIUS_M)] * n_stops)
 
 
 def _extract_geometry(raw: Any) -> GeoJSONLineString:
@@ -269,8 +263,13 @@ class OsrmBackend:
             )
 
         coords_segment = _format_coords(stops)
-        radiuses = _build_radiuses(n)
 
+        # NOTE: we do NOT send a `radiuses=...` snap constraint. The
+        # constraint constrained candidate routing edges so tightly that
+        # valid routes through the network were rejected (NoRoute /
+        # NoTrips) even when every stop snapped within the radius. Letting
+        # OSRM use its default unconstrained snapping is the right behavior
+        # for a small bbox where road density bounds the snap distance.
         if n == _MIN_STOPS:
             url = f"{self.base_url}{_FOOT_ROUTE_PATH.format(coords=coords_segment)}"
             params: dict[str, str] = {
@@ -278,7 +277,6 @@ class OsrmBackend:
                 "overview": "full",
                 "geometries": "geojson",
                 "annotations": "duration,distance",
-                "radiuses": radiuses,
             }
             stop_ordering: Literal["input_order", "tsp_optimized"] = "input_order"
             is_trip = False
@@ -291,7 +289,6 @@ class OsrmBackend:
                 "source": "first",
                 "destination": "last",
                 "roundtrip": "false",
-                "radiuses": radiuses,
             }
             stop_ordering = "tsp_optimized"
             is_trip = True

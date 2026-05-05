@@ -210,3 +210,96 @@ def test_unknown_maneuver_type_does_not_crash():
     )
     assert "40 m" in out
     assert "Columbus Circle" in out
+
+
+# ── empty street name (real OSRM behavior on foot.lua extracts) ────
+#
+# OSRM's foot profile leaves `name` empty for many walkable segments
+# (campus paths, unnamed alleys, internal park trails). The formatter
+# MUST drop the "onto/on the route" placeholder rather than render
+# nonsense like "Turn left onto the route".
+
+
+def test_depart_with_empty_name_drops_street_phrase():
+    out = format_step(
+        {"type": "depart", "bearing_after": 90},
+        name="",
+        distance_m=82,
+    )
+    assert out == "Head east for 80 m"
+    assert "the route" not in out
+
+
+def test_depart_with_none_name_drops_street_phrase():
+    out = format_step(
+        {"type": "depart", "bearing_after": 0},
+        name=None,
+        distance_m=42,
+    )
+    assert out == "Head north for 40 m"
+    assert "the route" not in out
+
+
+def test_continue_with_empty_name_drops_street_phrase():
+    out = format_step(
+        {"type": "continue"},
+        name="",
+        distance_m=200,
+    )
+    assert out == "Continue for 200 m"
+    assert "the route" not in out
+
+
+def test_new_name_with_empty_name_drops_street_phrase():
+    out = format_step(
+        {"type": "new name"},
+        name="",
+        distance_m=60,
+    )
+    assert out == "Continue for 60 m"
+
+
+def test_turn_left_with_empty_name_drops_onto_phrase():
+    out = format_step(
+        {"type": "turn", "modifier": "left"},
+        name="",
+        distance_m=10,
+    )
+    assert out == "Turn left"
+    assert "the route" not in out
+
+
+def test_turn_uturn_with_empty_name():
+    out = format_step(
+        {"type": "turn", "modifier": "uturn"},
+        name=None,
+        distance_m=50,
+    )
+    assert out == "Make a U-turn"
+    assert "the route" not in out
+
+
+# ── end-of-road maneuver (was falling through to _format_unknown) ──
+#
+# OSRM emits `end of road` when a path terminates at a junction and
+# the route continues onto the perpendicular road. It's effectively a
+# `continue`, just with a junction-specific name.
+
+
+def test_end_of_road_with_named_street():
+    out = format_step(
+        {"type": "end of road", "modifier": "right"},
+        name="Amsterdam Avenue",
+        distance_m=38,
+    )
+    assert out == "Continue on Amsterdam Avenue for 40 m"
+
+
+def test_end_of_road_with_empty_name_drops_street_phrase():
+    out = format_step(
+        {"type": "end of road", "modifier": "right"},
+        name="",
+        distance_m=38,
+    )
+    assert out == "Continue for 40 m"
+    assert "the route" not in out

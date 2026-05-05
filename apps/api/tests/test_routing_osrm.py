@@ -10,7 +10,10 @@ intercept httpx requests so the suite runs offline. Tests cover:
   - `mode="driving"` raises ValueError before any HTTP request.
   - OSRM `code="NoRoute"` surfaces as `RoutingBackendError("NoRoute", ...)`.
   - Single HTTP request per call, even for `/trip` with multiple legs.
-  - The `radiuses` query parameter has exactly N entries.
+  - No `radiuses` constraint is sent — OSRM is free to snap to the
+    nearest road regardless of distance. (Was previously `radiuses=50;...`
+    but that constrained candidate edges so tightly that valid routes
+    through the network were rejected with `NoRoute`/`NoTrips`.)
 """
 
 from __future__ import annotations
@@ -191,10 +194,9 @@ async def test_two_stop_call_hits_route_endpoint_with_geojson():
     assert "/trip/" not in str(request.url)
     # GeoJSON requested
     assert "geometries=geojson" in str(request.url)
-    # radiuses=50;50 (exactly 2 entries)
+    # No radiuses constraint — OSRM should snap freely to nearest road.
     qp = request.url.params
-    radiuses = qp.get("radiuses")
-    assert radiuses == "50;50"
+    assert qp.get("radiuses") is None
     # Coordinates: lon FIRST per OSRM convention.
     assert "-73.962,40.804;-73.964,40.811" in str(request.url)
 
@@ -251,7 +253,8 @@ async def test_four_stop_call_hits_trip_endpoint_with_tsp_params():
     assert qp.get("destination") == "last"
     assert qp.get("roundtrip") == "false"
     assert qp.get("geometries") == "geojson"
-    assert qp.get("radiuses") == "50;50;50;50"
+    # No radiuses constraint — see module docstring for rationale.
+    assert qp.get("radiuses") is None
 
     assert result.routing_backend == "osrm"
     assert result.stop_ordering == "tsp_optimized"
@@ -363,27 +366,29 @@ async def test_connection_error_maps_to_routing_backend_error():
     assert exc_info.value.code == "connection_error"
 
 
-# ── radiuses parameter has exactly N entries ───────────────────────
+# ── radiuses parameter is NOT sent (regression) ───────────────────
 
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_radiuses_param_has_n_entries_for_route():
-    """Spec scenario: snap radius is set to 50 m per stop (2 entries)."""
+async def test_route_request_omits_radiuses_param():
+    """The radiuses=50 constraint constrained candidate edges so tightly
+    that valid routes through the network were rejected (NoRoute/NoTrips
+    even when every stop snapped within 50m). The fix is to omit
+    radiuses entirely so OSRM uses its default unconstrained snapping."""
     mock = respx.get(re.compile(rf"^{_BASE_URL}/route/v1/foot/")).mock(
         return_value=httpx.Response(200, json=_route_response_2_stop())
     )
     backend = OsrmBackend(base_url=_BASE_URL)
     await backend.route([(40.804, -73.962), (40.811, -73.964)], mode="walking")
     qp = mock.calls[0].request.url.params
-    assert qp.get("radiuses") == "50;50"
-    assert qp["radiuses"].count("50") == 2
+    assert qp.get("radiuses") is None
 
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_radiuses_param_has_n_entries_for_trip():
-    """Spec scenario: 50 m per stop, regardless of /route or /trip."""
+async def test_trip_request_omits_radiuses_param():
+    """Same rationale as the /route case — see test above."""
     mock = respx.get(re.compile(rf"^{_BASE_URL}/trip/v1/foot/")).mock(
         return_value=httpx.Response(200, json=_trip_response_4_stop_permuted())
     )
@@ -398,5 +403,4 @@ async def test_radiuses_param_has_n_entries_for_trip():
         mode="walking",
     )
     qp = mock.calls[0].request.url.params
-    assert qp.get("radiuses") == "50;50;50;50"
-    assert qp["radiuses"].count("50") == 4
+    assert qp.get("radiuses") is None

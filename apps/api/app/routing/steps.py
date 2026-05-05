@@ -104,8 +104,14 @@ def format_step(
     Parameters mirror the OSRM step JSON:
       - `maneuver` is OSRM's `step.maneuver` dict (we read `type`,
         `modifier`, `bearing_after`).
-      - `name` is OSRM's `step.name` (street name, possibly empty).
+      - `name` is OSRM's `step.name` (street name, possibly empty —
+        the foot.lua profile commonly omits names on campus paths,
+        unnamed alleys, and internal park trails).
       - `distance_m` is OSRM's `step.distance` rounded to int.
+
+    When `name` is empty, the formatter drops the "onto/on the route"
+    suffix entirely rather than rendering a placeholder — "Turn left"
+    is more useful than "Turn left onto the route".
 
     The returned string is byte-equal across calls with identical input
     — the formatter is fully deterministic.
@@ -113,27 +119,36 @@ def format_step(
     mtype = (maneuver.get("type") or "").lower()
     modifier = (maneuver.get("modifier") or "").lower()
     bearing_after = maneuver.get("bearing_after")
-    street = (name or "").strip() or "the route"
+    street = (name or "").strip()  # empty string when no name
     rounded = _round_to_5m(distance_m)
 
     if mtype == "depart":
         cardinal = _bearing_to_cardinal(bearing_after)
-        return f"Head {cardinal} on {street} for {rounded} m"
+        on_street = f" on {street}" if street else ""
+        return f"Head {cardinal}{on_street} for {rounded} m"
 
-    if mtype in ("continue", "new name"):
-        return f"Continue on {street} for {rounded} m"
+    # `continue`, `new name`, and `end of road` all read as a continuation
+    # along (or through) the next segment; OSRM emits `end of road` when
+    # a path terminates at a junction and the route turns onto the
+    # perpendicular road, but for the user it's still "keep going".
+    if mtype in ("continue", "new name", "end of road"):
+        on_street = f" on {street}" if street else ""
+        return f"Continue{on_street} for {rounded} m"
 
     if mtype == "turn":
         # Special-case U-turn so the preposition reads naturally.
         if modifier == "uturn":
-            return f"Make a U-turn onto {street}"
-        phrase = _TURN_PHRASE.get(modifier, modifier or "right")
-        return f"Turn {phrase} onto {street}"
+            verb = "Make a U-turn"
+        else:
+            phrase = _TURN_PHRASE.get(modifier, modifier or "right")
+            verb = f"Turn {phrase}"
+        onto_street = f" onto {street}" if street else ""
+        return f"{verb}{onto_street}"
 
     if mtype == "arrive":
         # `name` doubles as the destination label when the caller has it
         # (the route planner passes the final stop's display name in).
-        destination = (name or "").strip() or "your destination"
+        destination = street or "your destination"
         return f"Arrive at {destination}"
 
     # Unknown maneuver types — keep the output readable rather than
@@ -144,6 +159,10 @@ def format_step(
 
 def _format_unknown(street: str, rounded: int) -> str:
     """Defensive fallback render for OSRM maneuver types not in the closed set."""
-    if rounded > 0 and street != "the route":
+    if rounded > 0 and street:
         return f"Continue on {street} for {rounded} m"
-    return f"Continue for {rounded} m"
+    if rounded > 0:
+        return f"Continue for {rounded} m"
+    if street:
+        return f"Continue on {street}"
+    return "Continue"
