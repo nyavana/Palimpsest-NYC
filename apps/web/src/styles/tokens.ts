@@ -8,21 +8,28 @@
  * importing this module directly. The module is exported for the few cases
  * where a value is needed in TS (e.g. inline styles for source-type chips
  * that are dynamic).
+ *
+ * Token names are legacy from the v1 "parchment & ink" direction. The
+ * current palette is the cool "twilight archive" set sourced from
+ * `docs/assets/Color.webp`: `parchment` is now pale lavender, `ink` is a
+ * deep indigo, `oxblood` is the primary plum, `archival-blue` is royal
+ * indigo, and `ochre` carries the bright magenta accent. Names were kept
+ * to avoid a 20+ file rename for cosmetic gain.
  */
 
 export const palette = {
-  parchment: "#f5f0e6",
-  "parchment-deep": "#ece5d5",
-  ink: "#0a0a0a",
-  "ink-soft": "#3a3a3a",
-  "ink-muted": "#6f6a5f",
-  hairline: "rgba(10, 10, 10, 0.10)",
-  oxblood: "#7a1f1f",
-  "oxblood-hover": "#5e1717",
-  "archival-blue": "#1d4ed8",
-  "archival-blue-visited": "#5b21b6",
-  ochre: "#b6873e",
-  success: "#3b6e3b",
+  parchment: "#EDF1FD",
+  "parchment-deep": "#DDE3F4",
+  ink: "#1A1F3A",
+  "ink-soft": "#3D4566",
+  "ink-muted": "#6A6F8C",
+  hairline: "rgba(83, 100, 192, 0.18)",
+  oxblood: "#77295D",
+  "oxblood-hover": "#5A1E48",
+  "archival-blue": "#5364C0",
+  "archival-blue-visited": "#6B3380",
+  ochre: "#C34FA2",
+  success: "#4A8A6E",
 } as const;
 
 /** Per-source brand colors for the citation chip. Closed set — V1 contract. */

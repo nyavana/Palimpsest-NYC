@@ -38,9 +38,9 @@ import {
 } from "./MapViewModeToggle";
 
 const WALK_LAYER = "walk";
-const PATH_COLOR = "#7a1f1f"; // tokens.palette.oxblood
-const FALLBACK_PATH_COLOR = "#6f6a5f"; // tokens.palette["ink-muted"]
-const MARKER_COLOR = "#7a1f1f";
+const PATH_COLOR = "#5364C0"; // tokens.palette["archival-blue"] — royal indigo
+const FALLBACK_PATH_COLOR = "#6A6F8C"; // tokens.palette["ink-muted"] — cool gray
+const MARKER_COLOR = "#77295D"; // tokens.palette.oxblood — plum
 const FLYTO_DURATION_MS = 1200;
 const TOGGLE_FLY_MS = 600;
 const PINNED_FLY_MIN_ZOOM = 17.5;
