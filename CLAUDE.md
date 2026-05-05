@@ -65,11 +65,19 @@ docker compose exec api python -m app.ingest.cli osm run
 docker compose exec api python -m app.ingest.cli wikipedia run
 ```
 
-End-to-end smoke test of the agent SSE endpoint:
+End-to-end smoke test of the agent SSE endpoint (V1.1: POST + JSON body):
 
 ```bash
-curl -N "http://localhost:8000/agent/ask?q=Tell+me+about+a+gothic+cathedral+in+Morningside+Heights"
+curl -N -X POST -H "Content-Type: application/json" \
+  -d '{"q":"Tell me about a gothic cathedral in Morningside Heights"}' \
+  http://localhost:8000/agent/ask
 # Expect SSE frames: turn → tool_call → tool_result → narration → citations → walk → done
+
+# BYOK mode (no OPENROUTER_API_KEY in .env): pass the user's credentials in
+# X-LLM-Credentials, base64(JSON({api_key, model, base_url?})):
+HEADER=$(printf '%s' '{"api_key":"sk-...","model":"openai/gpt-5.4-mini"}' | base64 -w0)
+curl -N -X POST -H "Content-Type: application/json" -H "X-LLM-Credentials: $HEADER" \
+  -d '{"q":"..."}' http://localhost:8000/agent/ask
 ```
 
 OpenSpec (spec-driven workflow used for change proposals):
@@ -88,7 +96,7 @@ Monorepo with three apps under `apps/` and a single root `docker-compose.yml`. T
 
 Wired in `app/main.py::create_app()` with a single async `lifespan` that builds and stores all long-lived singletons on `app.state`:
 
-- `app.state.llm_router` — cost-aware router (`app/llm/router.py`) with two tiers (`local` and `openrouter`), each with its own circuit breaker (3 fails / 60s window / 30s cooldown). Complexity dispatch: `simple` → local tier, `standard`/`complex` → cloud tier. **In V1 both tiers point at OpenRouter** — the split exists so v2 can repoint `LOCAL_LLM_BASE_URL` at an on-device endpoint without code change. Cache is keyed by canonicalized request hash with TTLs that vary by complexity.
+- `app.state.llm_router` — cost-aware router (`app/llm/router.py`) with two tiers (`local` and `openrouter`), each with its own circuit breaker (3 fails / 60s window / 30s cooldown). Complexity dispatch: `simple` → local tier, `standard`/`complex` → cloud tier. **In V1 both tiers point at OpenRouter** — the split exists so v2 can repoint `LOCAL_LLM_BASE_URL` at an on-device endpoint without code change. Cache is keyed by canonicalized request hash with TTLs that vary by complexity. **BYOK (V1.1):** when `OPENROUTER_API_KEY` is unset, this singleton is `None` and `app.state.byok_required` is `True`. `/agent/ask` then requires an `X-LLM-Credentials` header carrying base64(JSON({api_key, model, base_url?})), and the route builds a per-request router via `LLMRouter.with_user_credentials(...)` (or `build_byok_router(...)` when no singleton exists). The per-request router has fresh breakers and a no-op cache so a user's bad key cannot trip shared state.
 - `app.state.embedder` — `BAAI/bge-small-en-v1.5` sentence-transformer singleton (CPU-only, 384-dim). Weights live in the `hf-cache` volume mounted at `/cache/huggingface`.
 - `app.state.db_engine` / `db_session_factory` — async SQLAlchemy 2 over asyncpg. **Schema is owned by `app/db/migrations/*.sql`**, applied by the postgres entrypoint on first volume init in lex order. ORM models in `app/db/models.py` are read-only mirrors — never call `Base.metadata.create_all` in app code paths. Schema changes require `make nuke && make up`.
 - `app.state.agent_tool_registry` / `agent_loop_builder` — registers **two tools**: `search_places` (retrieval) and `plan_walk` (LLM-callable OSM-graph router, chosen by the LLM only for tour/route queries); any other tool name returns an `unknown_tool` error message back to the LLM and the loop continues.
@@ -114,7 +122,7 @@ Request flow: `RequestIdMiddleware` binds an `X-Request-ID` to structlog context
 
 `apps/web/src/components/MapView.tsx` consumes a `MapEngine` interface so the concrete engine (MapLibre today, Google Photorealistic 3D Tiles later) is selected from `VITE_MAP_ENGINE` and swappable in a single factory file (`src/map/`). Tailwind, ESLint, Prettier preconfigured. Dockerfile builds a static bundle behind nginx (port 80 in container, 5173 on the host).
 
-The SSE consumer lives in `src/state/sse.ts` and `src/state/useAgentSession.ts`; UI surfaces are split into `ChatPane`, `Composer`, `NarrationStream`, `CitationList` / `CitationCard`, `WalkTimeline`, and `WarningBanner`. The map and chat panes share state via `MapEngineContext`, and citations drive `flyTo` as they arrive on the wire — there is no client-side route planning, the SSE `walk` frame is authoritative.
+The SSE consumer lives in `src/state/sse.ts` (fetch + ReadableStream POST against `/agent/ask` since V1.1) and `src/state/useAgentSession.ts`; UI surfaces are split into `ChatPane`, `Composer`, `NarrationStream`, `CitationList` / `CitationCard`, `WalkTimeline`, `WarningBanner`, and the BYOK `SettingsModal` + `SettingsButton`. The map and chat panes share state via `MapEngineContext`, and citations drive `flyTo` as they arrive on the wire — there is no client-side route planning, the SSE `walk` frame is authoritative. Per-session LLM credentials live in `src/state/llmCredentials.ts` (sessionStorage only, never localStorage) and are encoded into the `X-LLM-Credentials` header by `openAgentStream`.
 
 ### `apps/worker` — minimal heartbeat (V1)
 

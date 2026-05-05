@@ -35,6 +35,7 @@ from app.llm.models import (
     ChatResponse,
     Complexity,
     NormalizedRequest,
+    NormalizedResponse,
     ToolCall,
     Usage,
 )
@@ -246,6 +247,40 @@ class LLMRouter:
         await self._local.aclose()
         await self._cloud.aclose()
 
+    # -- BYOK factory -----------------------------------------------
+
+    def with_user_credentials(
+        self,
+        *,
+        api_key: str,
+        model: str,
+        base_url: str,
+        timeout_s: float = 60.0,
+    ) -> "LLMRouter":
+        """Return a per-request router using user-supplied credentials.
+
+        The returned router has fresh, isolated circuit breakers and a
+        no-op cache so a user's bad key cannot trip the shared breaker
+        and BYOK responses cannot collide with the global cache. Both
+        the local and cloud tiers route to the user's (api_key, model,
+        base_url) — complexity dispatch becomes a no-op for this request,
+        but the `complexity` tag still flows through to telemetry.
+
+        IMPORTANT: do not log `repr(...)` of the returned router or its
+        adapters; httpx clients carry the Authorization header in their
+        defaults dict and would leak the key.
+        """
+        return _build_byok_router(
+            api_key=api_key,
+            model=model,
+            base_url=base_url,
+            timeout_s=timeout_s,
+            telemetry=self._telemetry,
+            cb_fail_threshold=self._local_breaker.fail_threshold,
+            cb_window_s=self._local_breaker.window_s,
+            cb_cooldown_s=self._local_breaker.cooldown_s,
+        )
+
     # -- Internal helpers -------------------------------------------
 
     def _select_backend(
@@ -298,6 +333,101 @@ class LLMRouter:
 
 
 # ── Factory ───────────────────────────────────────────────────────────
+
+
+# ── BYOK router ───────────────────────────────────────────────────────
+
+
+class _NullLLMCache(LLMCache):
+    """Cache that never hits and never stores. Used for BYOK routers."""
+
+    def __init__(self) -> None:  # noqa: D401 — intentional no super().__init__
+        # Bypass LLMCache.__init__ (which needs redis + ttl). The overridden
+        # methods never touch the unset attributes, so this is safe.
+        pass
+
+    async def get(self, request: NormalizedRequest) -> NormalizedResponse | None:
+        return None
+
+    async def put(
+        self,
+        request: NormalizedRequest,
+        response: NormalizedResponse,
+        complexity: Complexity,
+    ) -> None:
+        return None
+
+
+class _ByokRouter(LLMRouter):
+    """LLMRouter subclass that tags every request with `byok=true` for telemetry."""
+
+    async def chat(self, request: ChatRequest) -> ChatResponse:
+        tagged = ChatRequest(
+            messages=request.messages,
+            complexity=request.complexity,
+            tools=request.tools,
+            temperature=request.temperature,
+            max_tokens=request.max_tokens,
+            response_format=request.response_format,
+            tags={**request.tags, "byok": "true"},
+        )
+        return await super().chat(tagged)
+
+
+def _build_byok_router(
+    *,
+    api_key: str,
+    model: str,
+    base_url: str,
+    timeout_s: float,
+    telemetry: TelemetrySink,
+    cb_fail_threshold: int,
+    cb_window_s: int,
+    cb_cooldown_s: int,
+) -> "LLMRouter":
+    """Construct a fresh BYOK router. Two distinct adapters so aclose()
+    closes each httpx client exactly once."""
+    local = OpenRouterAdapter(base_url=base_url, api_key=api_key, timeout_s=timeout_s)
+    cloud = OpenRouterAdapter(base_url=base_url, api_key=api_key, timeout_s=timeout_s)
+    return _ByokRouter(
+        local=local,
+        cloud=cloud,
+        cache=_NullLLMCache(),
+        telemetry=telemetry,
+        config=BackendConfig(
+            local_model=model,
+            standard_model=model,
+            complex_model=model,
+        ),
+        cb_fail_threshold=cb_fail_threshold,
+        cb_window_s=cb_window_s,
+        cb_cooldown_s=cb_cooldown_s,
+    )
+
+
+def build_byok_router(
+    *,
+    api_key: str,
+    model: str,
+    base_url: str,
+    timeout_s: float,
+    telemetry: TelemetrySink,
+    cb_fail_threshold: int,
+    cb_window_s: int,
+    cb_cooldown_s: int,
+) -> "LLMRouter":
+    """Public BYOK factory used when the singleton router is None
+    (server in BYOK-required mode)."""
+    return _build_byok_router(
+        api_key=api_key,
+        model=model,
+        base_url=base_url,
+        timeout_s=timeout_s,
+        telemetry=telemetry,
+        cb_fail_threshold=cb_fail_threshold,
+        cb_window_s=cb_window_s,
+        cb_cooldown_s=cb_cooldown_s,
+    )
 
 
 def build_llm_router(

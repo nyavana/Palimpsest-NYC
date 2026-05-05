@@ -25,7 +25,7 @@ from app.llm.cache import CacheTtl, LLMCache
 from app.llm.router import build_llm_router
 from app.llm.telemetry import TelemetrySink
 from app.logging import configure_logging, get_logger
-from app.routes import agent, health, llm, meta
+from app.routes import agent, config, health, llm, meta
 from app.routing import OsrmBackend
 
 log = get_logger(__name__)
@@ -55,7 +55,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
     app.state.redis = redis_client
 
-    # LLM router: local-tier (V1 = OpenRouter free Gemma) + cloud-tier (OpenRouter)
+    # LLM router: local-tier (V1 = OpenRouter free Gemma) + cloud-tier (OpenRouter).
+    # When no OPENROUTER_API_KEY is configured, the server runs in BYOK mode:
+    # the singleton router is not built and every /agent/ask request must
+    # supply an X-LLM-Credentials header (decoded into a per-request router
+    # in routes/agent.py). /llm/chat returns 503 in this mode.
     cache = LLMCache(
         redis_client,
         CacheTtl(
@@ -65,22 +69,30 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         ),
     )
     telemetry = TelemetrySink(redis_client)
-    app.state.llm_router = build_llm_router(
-        openrouter_base_url=settings.openrouter.base_url,
-        openrouter_api_key=settings.openrouter.api_key.get_secret_value(),
-        openrouter_timeout_s=settings.openrouter.timeout_s,
-        standard_model=settings.openrouter.standard_model,
-        complex_model=settings.openrouter.complex_model,
-        local_base_url=settings.local_llm.base_url,
-        local_api_key=settings.local_llm.api_key.get_secret_value(),
-        local_model=settings.local_llm.model,
-        local_timeout_s=settings.local_llm.timeout_s,
-        cache=cache,
-        telemetry=telemetry,
-        cb_fail_threshold=settings.llm_router.cb_fail_threshold,
-        cb_window_s=settings.llm_router.cb_window_s,
-        cb_cooldown_s=settings.llm_router.cb_cooldown_s,
-    )
+    app.state.byok_required = settings.byok_required
+    app.state.llm_cache = cache
+    app.state.llm_telemetry = telemetry
+    if settings.byok_required:
+        app.state.llm_router = None
+        log.info("llm_router.byok_mode")
+    else:
+        assert settings.openrouter.api_key is not None  # narrowed by byok_required
+        app.state.llm_router = build_llm_router(
+            openrouter_base_url=settings.openrouter.base_url,
+            openrouter_api_key=settings.openrouter.api_key.get_secret_value(),
+            openrouter_timeout_s=settings.openrouter.timeout_s,
+            standard_model=settings.openrouter.standard_model,
+            complex_model=settings.openrouter.complex_model,
+            local_base_url=settings.local_llm.base_url,
+            local_api_key=settings.local_llm.api_key.get_secret_value(),
+            local_model=settings.local_llm.model,
+            local_timeout_s=settings.local_llm.timeout_s,
+            cache=cache,
+            telemetry=telemetry,
+            cb_fail_threshold=settings.llm_router.cb_fail_threshold,
+            cb_window_s=settings.llm_router.cb_window_s,
+            cb_cooldown_s=settings.llm_router.cb_cooldown_s,
+        )
 
     # Database (async SQLAlchemy)
     engine = build_engine(settings.postgres)
@@ -113,10 +125,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     tool_registry.register(SearchPlacesTool())
     tool_registry.register(PlanWalkTool())
     app.state.agent_tool_registry = tool_registry
-    app.state.agent_loop_builder = lambda _request: AgentLoop(
-        router=app.state.llm_router,
+    # The builder receives the per-request router (resolved by the route
+    # handler from either the singleton or X-LLM-Credentials). This lets
+    # BYOK and env-key paths share the same agent loop construction code.
+    app.state.agent_loop_builder = lambda _request, router: AgentLoop(
+        router=router,
         registry=tool_registry,
     )
+    # Stash the registry separately so the BYOK path in routes/agent.py can
+    # build an AgentLoop against a per-request router without going through
+    # the singleton-bound builder above.
+    app.state.agent_tool_registry = tool_registry
 
     # Meta-instrumentation harness (populated in task 9)
     from app.meta.session_log import SessionLogger
@@ -127,7 +146,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         log.info("api.shutdown")
-        await app.state.llm_router.aclose()
+        if app.state.llm_router is not None:
+            await app.state.llm_router.aclose()
         await engine.dispose()
         await redis_client.aclose()
 
@@ -155,6 +175,7 @@ def create_app() -> FastAPI:
 
     # ── Routes ─────────────────────────────────────────────────
     app.include_router(health.router)
+    app.include_router(config.router)
     app.include_router(llm.router, prefix="/llm", tags=["llm"])
     app.include_router(meta.router, prefix="/internal", tags=["meta"])
     app.include_router(agent.router)
