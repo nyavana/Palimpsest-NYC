@@ -729,6 +729,92 @@ async def test_turn_cap_at_seven_with_final_directive():
 # ── ToolExecutionContext.retrieval_ledger gets populated by the loop ─
 
 
+async def test_plan_walk_discovered_stops_enter_retrieval_ledger():
+    """plan_walk's auto-discovered POIs become part of the citation pool.
+
+    The LLM searches for A and B (turn 1), calls plan_walk on turn 2, and
+    plan_walk returns a `discovered_stops[]` containing doc C. The final
+    JSON cites C with retrieval_turn=2 — the verifier accepts it because
+    the loop registered C in the ledger when plan_walk returned.
+    """
+    import json as _json
+
+    search = _FixedSearchTool(_hits_two())
+
+    enriched_walk: dict[str, Any] = dict(_FAKE_WALK_RESULT)
+    enriched_walk["discovered_stops"] = [
+        {
+            "doc_id": "wikipedia:C",
+            "name": "Columbia University",
+            "source_type": "wikipedia",
+            "source_url": "https://en.wikipedia.org/wiki/Columbia_University",
+            "lat": 40.8075,
+            "lon": -73.9626,
+            "dist_to_route_m": 18.0,
+        }
+    ]
+
+    plan = _FakePlanWalkTool([enriched_walk])
+    registry = _registry_with_search_and_plan(search, plan)
+
+    final_with_discovered = _json.dumps(
+        {
+            "narration": "Walk through Columbia from A to B.",
+            "citations": [
+                {
+                    "doc_id": "wikipedia:A",
+                    "source_url": "https://en.wikipedia.org/wiki/A",
+                    "source_type": "wikipedia",
+                    "span": "intro",
+                    "retrieval_turn": 1,
+                },
+                {
+                    "doc_id": "wikipedia:C",
+                    "source_url": "https://en.wikipedia.org/wiki/Columbia_University",
+                    "source_type": "wikipedia",
+                    "span": "discovered",
+                    "retrieval_turn": 2,
+                },
+            ],
+        }
+    )
+
+    router = _ScriptedRouter(
+        [
+            _resp(
+                tool_calls=[
+                    ToolCall(id="c1", name="search_places", arguments={"query": "x"})
+                ]
+            ),
+            _resp(
+                tool_calls=[
+                    ToolCall(
+                        id="c2",
+                        name="plan_walk",
+                        arguments={"place_ids": ["wikipedia:A", "wikipedia:B"]},
+                    )
+                ]
+            ),
+            _resp(content=final_with_discovered),
+        ]
+    )
+    loop = AgentLoop(router=router, registry=registry)
+    result = await loop.run(
+        "plan a walk from A to B",
+        context=ToolExecutionContext(),
+    )
+
+    # plan_walk's discovered POI is in the ledger and citable.
+    assert result.verified is True
+    cited_ids = {c.doc_id for c in result.citations}
+    assert "wikipedia:C" in cited_ids
+    # Ledger ledger registered C on turn 2 (the plan_walk turn).
+    entry = result.ledger.lookup("wikipedia:C", on_or_before_turn=2)
+    assert entry is not None
+    assert entry.source_type == "wikipedia"
+    assert entry.source_url == "https://en.wikipedia.org/wiki/Columbia_University"
+
+
 async def test_loop_populates_retrieval_ledger_on_context():
     """The plan_walk tool requires a per-conversation RetrievalLedger on
     its context. The loop owns the ledger and mutates it onto the

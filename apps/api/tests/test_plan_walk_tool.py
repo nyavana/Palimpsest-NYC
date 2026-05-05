@@ -71,16 +71,43 @@ def _planned_stops(place_ids: list[str]) -> list[PlannedStop]:
     return out
 
 
-def _patch_db_helper(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Stub out the DB-backed `plan_walk` so tests don't need postgres."""
+def _patch_db_helper(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    discovered: list[dict[str, Any]] | None = None,
+) -> None:
+    """Stub out the DB-backed `plan_walk` and `discover_pois_along_route`.
 
-    async def fake(
+    By default, `discover_pois_along_route` returns `[]` so the existing
+    no-enrichment behaviour is preserved for tests that don't care about
+    the auto-discovery branch. Pass `discovered=[...]` to exercise the
+    enrichment path with a deterministic POI list.
+    """
+
+    async def fake_plan(
         *, session: Any, place_ids: list[str]
     ) -> list[PlannedStop]:
         del session  # unused; matches the real helper's keyword-only signature
         return _planned_stops(place_ids)
 
-    monkeypatch.setattr("app.agent.tools.plan_walk.plan_walk_db", fake)
+    monkeypatch.setattr("app.agent.tools.plan_walk.plan_walk_db", fake_plan)
+
+    discovered_payload = list(discovered or [])
+
+    async def fake_discover(
+        *,
+        session: Any,
+        route_geometry: dict[str, Any],
+        exclude_doc_ids: list[str],
+        radius_m: int = 150,
+        limit: int = 3,
+    ) -> list[dict[str, Any]]:
+        del session, route_geometry, exclude_doc_ids, radius_m, limit
+        return list(discovered_payload)
+
+    monkeypatch.setattr(
+        "app.agent.tools.plan_walk.discover_pois_along_route", fake_discover
+    )
 
 
 def _line(coords: list[list[float]]) -> GeoJSONLineString:
@@ -113,10 +140,21 @@ def _leg(
 
 
 class _FakeRoutingBackend:
-    """In-test stand-in for `OsrmBackend` that returns a fixed `RouteResult`."""
+    """In-test stand-in for `OsrmBackend`.
 
-    def __init__(self, result: RouteResult | None = None, *, raise_exc: Exception | None = None) -> None:
+    Returns `result` repeatedly, OR consumes from `results` in order on
+    each successive call (used to drive the enrichment re-route path).
+    """
+
+    def __init__(
+        self,
+        result: RouteResult | None = None,
+        *,
+        results: list[RouteResult] | None = None,
+        raise_exc: Exception | None = None,
+    ) -> None:
         self._result = result
+        self._results = list(results) if results is not None else None
         self._raise = raise_exc
         self.calls: list[tuple[list[tuple[float, float]], str]] = []
 
@@ -128,6 +166,10 @@ class _FakeRoutingBackend:
         self.calls.append((list(stops), mode))
         if self._raise is not None:
             raise self._raise
+        if self._results is not None:
+            if not self._results:
+                raise AssertionError("_FakeRoutingBackend exhausted scripted results")
+            return self._results.pop(0)
         assert self._result is not None
         return self._result
 
@@ -465,3 +507,262 @@ async def test_osrm_down_falls_back_to_haversine(
         and "connection_error" in rec.get("error", "")
         for rec in captured
     )
+
+
+# ── Auto-enrichment of A→B routes with along-route POIs ───────────
+
+
+def _initial_two_stop_result() -> RouteResult:
+    return RouteResult(
+        geometry=_line(
+            [
+                [-73.9619, 40.8038],
+                [-73.9622, 40.8070],
+                [-73.9626, 40.8108],
+            ]
+        ),
+        total_distance_m=900,
+        total_duration_s=640,
+        legs=[_leg(from_index=0, to_index=1, distance_m=900, duration_s=640)],
+        routing_backend="osrm",
+        stop_ordering="input_order",
+    )
+
+
+def _enriched_three_stop_tsp_result() -> RouteResult:
+    return RouteResult(
+        geometry=_line(
+            [
+                [-73.9619, 40.8038],
+                [-73.9626, 40.8075],
+                [-73.9626, 40.8108],
+            ]
+        ),
+        total_distance_m=950,
+        total_duration_s=680,
+        legs=[
+            _leg(from_index=0, to_index=1, distance_m=420, duration_s=300),
+            _leg(from_index=1, to_index=2, distance_m=530, duration_s=380),
+        ],
+        routing_backend="osrm",
+        stop_ordering="tsp_optimized",
+    )
+
+
+async def test_two_stop_route_auto_enriches_with_along_route_pois(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A→B with one nearby POI returns 3 stops + a populated discovered_stops."""
+    discovered = [
+        {
+            "doc_id": "wikipedia:C",
+            "name": "Columbia University",
+            "source_type": "wikipedia",
+            "source_url": "https://en.wikipedia.org/wiki/Columbia_University",
+            "lat": 40.8075,
+            "lon": -73.9626,
+            "dist_to_route_m": 18.0,
+            "along_t": 0.55,
+        }
+    ]
+    _patch_db_helper(monkeypatch, discovered=discovered)
+    backend = _FakeRoutingBackend(
+        results=[_initial_two_stop_result(), _enriched_three_stop_tsp_result()]
+    )
+    ctx = ToolExecutionContext(
+        session=object(),
+        routing_backend=backend,
+        retrieval_ledger=_ledger_with("wikipedia:A", "wikipedia:B"),
+    )
+
+    out = await PlanWalkTool().run(
+        {"place_ids": ["wikipedia:A", "wikipedia:B"]}, ctx
+    )
+
+    assert "error" not in out
+    assert len(out["stops"]) == 3
+    assert [s["doc_id"] for s in out["stops"]] == [
+        "wikipedia:A",
+        "wikipedia:C",
+        "wikipedia:B",
+    ]
+    assert out["discovered_stops"] == [
+        {
+            "doc_id": "wikipedia:C",
+            "name": "Columbia University",
+            "source_type": "wikipedia",
+            "source_url": "https://en.wikipedia.org/wiki/Columbia_University",
+            "lat": 40.8075,
+            "lon": -73.9626,
+            "dist_to_route_m": 18.0,
+        }
+    ]
+    # Two routing calls: the A→B probe, then the enriched 3-stop re-route.
+    assert len(backend.calls) == 2
+    assert backend.calls[0][0] == [(40.8038, -73.9619), (40.8108, -73.9626)]
+    assert backend.calls[1][0] == [
+        (40.8038, -73.9619),
+        (40.8075, -73.9626),
+        (40.8108, -73.9626),
+    ]
+
+
+async def test_two_stop_route_with_no_nearby_pois_returns_unenriched(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Empty discovered list ⇒ original 2-stop route, single routing call."""
+    _patch_db_helper(monkeypatch, discovered=[])
+    backend = _FakeRoutingBackend(result=_initial_two_stop_result())
+    ctx = ToolExecutionContext(
+        session=object(),
+        routing_backend=backend,
+        retrieval_ledger=_ledger_with("wikipedia:A", "wikipedia:B"),
+    )
+
+    out = await PlanWalkTool().run(
+        {"place_ids": ["wikipedia:A", "wikipedia:B"]}, ctx
+    )
+
+    assert [s["doc_id"] for s in out["stops"]] == ["wikipedia:A", "wikipedia:B"]
+    assert out["discovered_stops"] == []
+    assert len(backend.calls) == 1
+
+
+async def test_four_stop_input_skips_enrichment(monkeypatch: pytest.MonkeyPatch):
+    """LLM hand-curated 4 stops ⇒ tool respects the curation, never enriches."""
+    discovered = [
+        {
+            "doc_id": "wikipedia:Z",
+            "name": "Z",
+            "source_type": "wikipedia",
+            "source_url": "https://en.wikipedia.org/wiki/Z",
+            "lat": 40.81,
+            "lon": -73.96,
+            "dist_to_route_m": 5.0,
+            "along_t": 0.5,
+        }
+    ]
+    _patch_db_helper(monkeypatch, discovered=discovered)
+    fake_result = RouteResult(
+        geometry=_line([[0.0, 0.0], [1.0, 1.0]]),
+        total_distance_m=1245,
+        total_duration_s=890,
+        legs=[
+            _leg(from_index=0, to_index=2, distance_m=300, duration_s=200),
+            _leg(from_index=2, to_index=1, distance_m=400, duration_s=290),
+            _leg(from_index=1, to_index=3, distance_m=545, duration_s=400),
+        ],
+        routing_backend="osrm",
+        stop_ordering="tsp_optimized",
+    )
+    backend = _FakeRoutingBackend(result=fake_result)
+    ctx = ToolExecutionContext(
+        session=object(),
+        routing_backend=backend,
+        retrieval_ledger=_ledger_with(
+            "wikipedia:A", "wikipedia:B", "wikipedia:C", "wikipedia:D"
+        ),
+    )
+
+    out = await PlanWalkTool().run(
+        {
+            "place_ids": [
+                "wikipedia:A",
+                "wikipedia:B",
+                "wikipedia:C",
+                "wikipedia:D",
+            ]
+        },
+        ctx,
+    )
+
+    assert out["discovered_stops"] == []
+    assert len(out["stops"]) == 4
+    assert len(backend.calls) == 1
+
+
+async def test_haversine_fallback_skips_enrichment(monkeypatch: pytest.MonkeyPatch):
+    """When OSRM is unreachable the tool returns the haversine route untouched
+    — no buffer query, no second routing call, `discovered_stops == []`."""
+    discovered = [
+        {
+            "doc_id": "wikipedia:C",
+            "name": "Columbia",
+            "source_type": "wikipedia",
+            "source_url": "https://en.wikipedia.org/wiki/Columbia_University",
+            "lat": 40.8075,
+            "lon": -73.9626,
+            "dist_to_route_m": 18.0,
+            "along_t": 0.5,
+        }
+    ]
+    _patch_db_helper(monkeypatch, discovered=discovered)
+    backend = _FakeRoutingBackend(
+        raise_exc=RoutingBackendError("connection_error", "connection refused")
+    )
+    ctx = ToolExecutionContext(
+        session=object(),
+        routing_backend=backend,
+        retrieval_ledger=_ledger_with("wikipedia:A", "wikipedia:B"),
+    )
+
+    out = await PlanWalkTool().run(
+        {"place_ids": ["wikipedia:A", "wikipedia:B"]}, ctx
+    )
+
+    assert out["routing_backend"] == "haversine_fallback"
+    assert out["discovered_stops"] == []
+    # Only the initial routing attempt happened; no re-route.
+    assert len(backend.calls) == 1
+
+
+async def test_enrichment_re_route_failure_falls_back_to_initial_route(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Initial OSRM call succeeds, discovery returns POIs, but the re-route
+    fails. Tool returns the original 2-stop OSRM route with no enrichment
+    rather than escalating the failure."""
+    discovered = [
+        {
+            "doc_id": "wikipedia:C",
+            "name": "Columbia",
+            "source_type": "wikipedia",
+            "source_url": "https://en.wikipedia.org/wiki/Columbia_University",
+            "lat": 40.8075,
+            "lon": -73.9626,
+            "dist_to_route_m": 18.0,
+            "along_t": 0.5,
+        }
+    ]
+    _patch_db_helper(monkeypatch, discovered=discovered)
+
+    # First call returns the initial 2-stop OSRM result; second raises.
+    initial = _initial_two_stop_result()
+    call_count = {"n": 0}
+
+    class _FlakyBackend:
+        def __init__(self) -> None:
+            self.calls: list[tuple[list[tuple[float, float]], str]] = []
+
+        async def route(self, stops, mode="walking"):
+            self.calls.append((list(stops), mode))
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                return initial
+            raise RoutingBackendError("NoRoute", "re-route failed")
+
+    backend = _FlakyBackend()
+    ctx = ToolExecutionContext(
+        session=object(),
+        routing_backend=backend,
+        retrieval_ledger=_ledger_with("wikipedia:A", "wikipedia:B"),
+    )
+
+    out = await PlanWalkTool().run(
+        {"place_ids": ["wikipedia:A", "wikipedia:B"]}, ctx
+    )
+
+    assert out["routing_backend"] == "osrm"
+    assert [s["doc_id"] for s in out["stops"]] == ["wikipedia:A", "wikipedia:B"]
+    assert out["discovered_stops"] == []
+    assert call_count["n"] == 2

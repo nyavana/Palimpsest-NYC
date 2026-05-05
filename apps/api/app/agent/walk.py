@@ -30,6 +30,7 @@ walking corpus grows large enough that ordering matters.
 
 from __future__ import annotations
 
+import json
 import math
 from dataclasses import dataclass
 from typing import Any
@@ -135,3 +136,114 @@ async def plan_walk(
         coords[row["doc_id"]] = (float(row["lat"]), float(row["lon"]))
         names[row["doc_id"]] = row["name"]
     return plan_walk_from_coords(place_ids, coords, names=names)
+
+
+# ── Along-route POI discovery ──────────────────────────────────────
+
+
+# Default candidate-pool overage. The DB returns this many top-ranked
+# rows (quality first, distance second); the helper then keeps `limit`
+# of them and re-sorts those `limit` along the route.
+_DISCOVER_CANDIDATE_OVERAGE = 12
+
+# A LineString needs at least 2 vertices to define a routable segment.
+_MIN_LINESTRING_VERTICES = 2
+
+
+def _is_routable_linestring(geometry: Any) -> bool:
+    """A LineString needs at least 2 vertices to define a route segment."""
+    if not isinstance(geometry, dict):
+        return False
+    if geometry.get("type") != "LineString":
+        return False
+    coords = geometry.get("coordinates")
+    return isinstance(coords, list) and len(coords) >= _MIN_LINESTRING_VERTICES
+
+
+async def discover_pois_along_route(
+    *,
+    session: Any,
+    route_geometry: dict[str, Any],
+    exclude_doc_ids: list[str],
+    radius_m: int = 150,
+    limit: int = 3,
+) -> list[dict[str, Any]]:
+    """Find POIs near a walking route polyline, excluding already-visited stops.
+
+    Buffers `route_geometry` (a GeoJSON LineString in `[lon, lat]` order) by
+    `radius_m` meters, keeps the top `limit` POIs by source quality + distance
+    to the line, and returns them sorted by `along_t ∈ [0,1]` so the caller
+    can splice them into the route in walking order.
+
+    Each returned dict has the citation-shape provenance fields
+    (`doc_id`, `name`, `source_type`, `source_url`) plus `lat`, `lon`,
+    `dist_to_route_m`, and `along_t` for the caller's bookkeeping.
+    """
+    if not _is_routable_linestring(route_geometry):
+        return []
+    if limit <= 0:
+        return []
+
+    candidate_limit = max(limit, _DISCOVER_CANDIDATE_OVERAGE)
+
+    sql = text(
+        """
+        WITH route AS (
+            SELECT ST_SetSRID(ST_GeomFromGeoJSON(:route_geojson), 4326) AS line_geom
+        )
+        SELECT
+            p.doc_id,
+            p.name,
+            p.source_type,
+            p.source_url,
+            ST_Y(p.geom::geometry) AS lat,
+            ST_X(p.geom::geometry) AS lon,
+            ST_Distance(
+                p.geom,
+                (SELECT line_geom FROM route)::geography
+            ) AS dist_m,
+            ST_LineLocatePoint(
+                (SELECT line_geom FROM route),
+                p.geom::geometry
+            ) AS along_t
+        FROM places p
+        WHERE ST_DWithin(
+                p.geom,
+                (SELECT line_geom FROM route)::geography,
+                :radius_m
+              )
+          AND NOT (p.doc_id = ANY(:exclude_ids))
+        ORDER BY (p.source_type IN ('wikipedia', 'wikidata')) DESC, dist_m ASC
+        LIMIT :limit
+        """
+    )
+
+    params = {
+        "route_geojson": json.dumps(route_geometry),
+        "radius_m": int(radius_m),
+        "exclude_ids": list(exclude_doc_ids),
+        "limit": int(candidate_limit),
+    }
+    result = await session.execute(sql, params)
+
+    candidates: list[dict[str, Any]] = []
+    for row in result.mappings():
+        source_type = row["source_type"]
+        if not isinstance(source_type, str):
+            source_type = getattr(source_type, "value", str(source_type))
+        candidates.append(
+            {
+                "doc_id": row["doc_id"],
+                "name": row["name"],
+                "source_type": source_type,
+                "source_url": row["source_url"],
+                "lat": float(row["lat"]),
+                "lon": float(row["lon"]),
+                "dist_to_route_m": float(row["dist_m"]),
+                "along_t": float(row["along_t"]),
+            }
+        )
+
+    picked = candidates[:limit]
+    picked.sort(key=lambda p: p["along_t"])
+    return picked

@@ -114,12 +114,14 @@ Tools you can call:
       * You can identify at least 2 distinct places worth visiting.
     Do NOT call plan_walk for purely informational questions about a single place ("tell me about X"), comparison questions that do not imply visiting ("which is older, X or Y"), or queries the user has not asked for a route on.
 
+For routes between two points (e.g. "from Columbia to Central Park"), you only need to identify the two endpoints and pass them to plan_walk; the tool auto-discovers nearby POIs along the path and adds them to the route. Each auto-discovered stop is returned in the tool result's `discovered_stops[]` with full citation provenance and joins the citation pool — you may cite its doc_id in your narration just like a search_places hit.
+
 You have a hard budget of 7 turns. Plan to finalize by turn 4 at the latest. Excessive searching wastes the user's time.
 
 Workflow:
   1. Search 1-3 times via search_places to gather candidates.
   2. Decide whether to call plan_walk based on the rules above.
-  3. If you called plan_walk, the tool result includes `total_distance_m` and `legs[].steps[]`; you MAY mention these in narration but MUST still emit the final JSON {narration, citations[]} with citations drawn from search_places results (NOT plan_walk).
+  3. If you called plan_walk, the tool result includes `total_distance_m`, `legs[].steps[]`, and `discovered_stops[]`. You MAY mention the route metrics in narration; you SHOULD weave the discovered stops into the narration when they are relevant.
   4. Emit the final JSON. If you did not call plan_walk, citations alone drive the user-facing response.
 
 When you have enough information (typically after 1-3 search calls), return your FINAL answer as a strict JSON object with exactly two fields:
@@ -127,17 +129,16 @@ When you have enough information (typically after 1-3 search calls), return your
   - "citations": a non-empty array of citation objects.
 
 Each citation MUST have all five fields:
-  - "doc_id" (string) — copied verbatim from a search_places result.
+  - "doc_id" (string) — copied verbatim from a search_places result OR a plan_walk `discovered_stops[]` entry.
   - "source_url" (string) — copied verbatim from the same result.
   - "source_type" (string) — copied verbatim ("wikipedia", "wikidata", or "osm").
   - "span" (string) — short free-form annotation (e.g. "intro", "first sentence", "").
-  - "retrieval_turn" (integer) — the 1-based turn on which search_places returned this doc.
+  - "retrieval_turn" (integer) — the 1-based turn on which the doc was returned. For doc_ids from plan_walk's `discovered_stops[]`, use the turn on which plan_walk was called.
 
 Rules:
   - You MUST call search_places at least once before producing the final JSON.
-  - Every citation MUST reference a doc_id that was actually returned by search_places earlier in this conversation. plan_walk does NOT contribute new doc_ids to the citation pool — it only routes through doc_ids you already retrieved.
+  - Every citation MUST reference a doc_id that was actually returned earlier in this conversation — either by search_places or in a plan_walk `discovered_stops[]` entry. Do NOT invent doc_ids.
   - Output ONLY the JSON object as your final response — no prose, no markdown fences.
-  - Do NOT cite a doc_id you did not retrieve, and do NOT invent doc_ids.
   - If your first 1-2 searches returned good results, STOP searching and emit the final JSON.
 """
 
@@ -294,6 +295,14 @@ class AgentLoop:
                         and "error" not in output
                     ):
                         latest_walk = output
+                        # plan_walk auto-discovers POIs along the route and
+                        # surfaces them under `discovered_stops[]`. Each row
+                        # carries the citation-shape provenance fields the
+                        # ledger needs, so register them on the same turn so
+                        # the LLM can cite them in the final JSON.
+                        discovered = output.get("discovered_stops")
+                        if isinstance(discovered, list) and discovered:
+                            ledger.add(turn=turn, hits=discovered)
                 continue  # round-trip again so the LLM sees the tool result
 
             # No tool call — assume the LLM is producing a final answer.

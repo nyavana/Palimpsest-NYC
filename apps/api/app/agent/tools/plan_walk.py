@@ -2,10 +2,13 @@
 
 The LLM picks `place_ids` (returned by prior `search_places` calls) and
 this tool turns them into a real walking route via the
-`RoutingBackend` injected on the `ToolExecutionContext`. The tool is the
-single seam between the LLM's narrative ordering and the OSM-backed
-routing engine; it never enters new `doc_id`s into the citation pool —
-it only routes through ones the agent has already retrieved.
+`RoutingBackend` injected on the `ToolExecutionContext`. When the LLM
+passes a small endpoint set (≤ 3 stops), the tool also auto-discovers
+nearby POIs along the path and splices them into the route as extra
+stops; those stops are surfaced under `discovered_stops[]` with full
+citation provenance and the agent loop registers them in the
+per-conversation `RetrievalLedger` so the LLM can cite them in its
+final JSON.
 
 V1 contract (see
 `openspec/changes/agent-route-planning/specs/agent-tools/spec.md` and
@@ -23,11 +26,11 @@ V1 contract (see
     identical `RouteResult` built from straight-line haversine legs.
     The fallback logs a structured warning so telemetry sees the
     degradation, then returns the dict — the agent loop never sees an
-    exception.
+    exception. Haversine-fallback routes are NOT auto-enriched.
 
 The tool's return value is a JSON-serializable dict whose keys mirror
-the `RouteResult` dataclass; the SSE handler will eventually emit it
-as the `walk` frame byte-for-byte.
+the `RouteResult` dataclass plus `discovered_stops[]`; the SSE handler
+emits it as the `walk` frame byte-for-byte.
 """
 
 from __future__ import annotations
@@ -37,7 +40,7 @@ from typing import Any
 import structlog
 
 from app.agent.tools.base import Tool, ToolExecutionContext
-from app.agent.walk import PlannedStop, haversine_m
+from app.agent.walk import PlannedStop, discover_pois_along_route, haversine_m
 from app.agent.walk import plan_walk as plan_walk_db
 from app.routing import RoutingBackendError
 
@@ -50,6 +53,16 @@ WALK_M_PER_S = 1.4
 # marker, which the citation-driven map already shows. Mirrors the JSON
 # Schema `minItems=2` on `place_ids`.
 _MIN_DISTINCT_STOPS = 2
+
+# Auto-enrichment kicks in only when the LLM passed a small endpoint set.
+# At ≥4 stops the LLM has clearly hand-curated and we don't second-guess.
+_AUTO_ENRICH_MAX_INPUT_STOPS = 3
+
+# Buffer-search radius and per-route POI cap. These match the documented
+# defaults in `docs/...` and keep the total stop count comfortably under
+# the OSRM /trip 8-stop ceiling (3 input + 3 enriched = 6 max).
+_ENRICH_RADIUS_M = 150
+_ENRICH_LIMIT = 3
 
 _SUPPORTED_MODES = frozenset({"walking"})
 
@@ -195,6 +208,92 @@ def _reorder_stops_by_legs(
     return out
 
 
+async def _maybe_enrich_route(
+    *,
+    context: ToolExecutionContext,
+    place_ids: list[str],
+    initial_result: Any,
+    stops_input_order: list[PlannedStop],
+) -> tuple[Any, list[PlannedStop], list[dict[str, Any]]]:
+    """Auto-discover POIs along the initial route and re-route through them.
+
+    Returns `(result, stops, discovered)`. On any reason to skip
+    (LLM hand-curated, haversine fallback, no candidates, re-route failed),
+    returns the inputs unchanged with `discovered=[]` so the caller's
+    output path is identical.
+    """
+    if (
+        len(place_ids) > _AUTO_ENRICH_MAX_INPUT_STOPS
+        or initial_result.routing_backend != "osrm"
+    ):
+        return initial_result, stops_input_order, []
+
+    discovered = await discover_pois_along_route(
+        session=context.session,
+        route_geometry=initial_result.geometry,
+        exclude_doc_ids=list(place_ids),
+        radius_m=_ENRICH_RADIUS_M,
+        limit=_ENRICH_LIMIT,
+    )
+    if not discovered:
+        return initial_result, stops_input_order, []
+
+    enriched_stops = _splice_discovered_stops(stops_input_order, discovered)
+    enriched_coords = [(s.lat, s.lon) for s in enriched_stops]
+    try:
+        enriched_result = await context.routing_backend.route(
+            enriched_coords, mode="walking"
+        )
+    except RoutingBackendError:
+        # Re-route failed — keep the unenriched route rather than escalate.
+        return initial_result, stops_input_order, []
+
+    return enriched_result, enriched_stops, discovered
+
+
+def _splice_discovered_stops(
+    stops_input_order: list[PlannedStop],
+    discovered: list[dict[str, Any]],
+) -> list[PlannedStop]:
+    """Splice discovered POIs (already in along-route order) between the
+    first and last input stops. The endpoints stay pinned; OSRM's TSP
+    on the re-route is free to permute the intermediates if a shorter
+    permutation exists, but in practice along_t order is already close
+    to optimal for routes through a corpus dense at the endpoints."""
+    if len(stops_input_order) < _MIN_DISTINCT_STOPS or not discovered:
+        return list(stops_input_order)
+    head = stops_input_order[0]
+    tail = stops_input_order[-1]
+    middle_existing = list(stops_input_order[1:-1])
+    middle_discovered = [
+        PlannedStop(
+            index=0,  # reassigned by _stop_to_dict at output time
+            doc_id=poi["doc_id"],
+            name=poi["name"],
+            lat=float(poi["lat"]),
+            lon=float(poi["lon"]),
+            leg_distance_m=0.0,
+        )
+        for poi in discovered
+    ]
+    return [head, *middle_existing, *middle_discovered, tail]
+
+
+def _discovered_to_dict(poi: dict[str, Any]) -> dict[str, Any]:
+    """Project a `discover_pois_along_route` row into the wire shape we
+    surface alongside the route. We drop `along_t` (internal bookkeeping)
+    and keep the citation-shape provenance fields plus distance-to-route."""
+    return {
+        "doc_id": poi["doc_id"],
+        "name": poi["name"],
+        "source_type": poi["source_type"],
+        "source_url": poi["source_url"],
+        "lat": float(poi["lat"]),
+        "lon": float(poi["lon"]),
+        "dist_to_route_m": float(poi["dist_to_route_m"]),
+    }
+
+
 def _haversine_fallback_result(
     stops_in_order: list[PlannedStop],
     *,
@@ -228,6 +327,7 @@ def _haversine_fallback_result(
             "total_duration_s": 0,
             "routing_backend": "haversine_fallback",
             "stop_ordering": "input_order",
+            "discovered_stops": [],
         }
 
     legs: list[dict[str, Any]] = []
@@ -280,6 +380,7 @@ def _haversine_fallback_result(
         "total_duration_s": total_duration_s,
         "routing_backend": "haversine_fallback",
         "stop_ordering": "input_order",
+        "discovered_stops": [],
     }
 
 
@@ -292,9 +393,13 @@ class PlanWalkTool(Tool):
     name = "plan_walk"
     description = (
         "Plan a real walking route through the given places, in the order "
-        "provided. Call this ONLY when the user wants a tour, route, or "
-        "directions across two or more places. Do NOT call for single-place "
-        "or purely informational questions."
+        "provided. When you pass 2-3 endpoints, the tool also auto-discovers "
+        "interesting POIs along the path and adds them to the route as extra "
+        "stops; the response's `discovered_stops[]` lists each one with full "
+        "citation provenance (`doc_id`, `source_url`, `source_type`) so you "
+        "can cite them in your narration. Call this ONLY when the user wants "
+        "a tour, route, or directions across two or more places. Do NOT "
+        "call for single-place or purely informational questions."
     )
     parameters = _PARAMETERS
 
@@ -369,7 +474,15 @@ class PlanWalkTool(Tool):
         except RoutingBackendError as exc:
             return _haversine_fallback_result(stops_input_order, error=exc)
 
-        # ── 6. Reorder stops to executed visit order ──────────────
+        # ── 6. Auto-enrich with along-route POIs (default behaviour) ─
+        result, stops_input_order, discovered = await _maybe_enrich_route(
+            context=context,
+            place_ids=place_ids,
+            initial_result=result,
+            stops_input_order=stops_input_order,
+        )
+
+        # ── 7. Reorder stops to executed visit order ──────────────
         if result.stop_ordering == "tsp_optimized":
             stops_executed = _reorder_stops_by_legs(stops_input_order, result.legs)
         else:
@@ -378,4 +491,8 @@ class PlanWalkTool(Tool):
         stops_payload = [
             _stop_to_dict(stop, index=i) for i, stop in enumerate(stops_executed)
         ]
-        return _route_result_to_dict(result, stops_payload=stops_payload)
+        out = _route_result_to_dict(result, stops_payload=stops_payload)
+        out["discovered_stops"] = [
+            _discovered_to_dict(poi) for poi in discovered
+        ]
+        return out
