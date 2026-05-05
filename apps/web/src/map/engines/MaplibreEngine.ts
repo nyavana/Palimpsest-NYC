@@ -11,11 +11,13 @@ import maplibregl, {
   LngLatBoundsLike,
   Map as MaplibreMap,
   Marker as MlMarker,
+  Popup as MlPopup,
   StyleSpecification,
 } from "maplibre-gl";
 
 import { MapEngine, MapEngineLifecycleError } from "../MapEngine";
-import type { LatLng, Marker, PathStyle, Unsubscribe, Viewport } from "../types";
+import type { LatLng, Marker, MarkerEvent, PathStyle, Unsubscribe, Viewport } from "../types";
+import { MarkerEventBus } from "./MarkerEventBus";
 
 // A minimal raster style using OSM tiles. Good enough for v1; upgraded later
 // to a vector style with extruded buildings.
@@ -50,6 +52,8 @@ export class MaplibreEngine implements MapEngine {
   private markerLayers = new Map<string, MarkerLayer>();
   private pathLayers = new Set<string>();
   private destroyed = false;
+  private events = new MarkerEventBus();
+  private popup: MlPopup | null = null;
 
   async init(container: HTMLElement, initialView: Viewport): Promise<void> {
     if (this.destroyed) {
@@ -122,6 +126,7 @@ export class MaplibreEngine implements MapEngine {
       el.style.background = m.color ?? "#0a0a0a";
       el.style.border = "2px solid #f5f0e6";
       el.style.boxShadow = "0 1px 4px rgba(0,0,0,0.3)";
+      el.style.cursor = "pointer";
       if (m.label) {
         el.title = m.label;
       }
@@ -129,6 +134,7 @@ export class MaplibreEngine implements MapEngine {
         .setLngLat([m.position.lng, m.position.lat])
         .addTo(map);
       instances.push(marker);
+      this.events.attach(layerId, m.id, el, m.position);
     }
     this.markerLayers.set(layerKey, { instances });
   }
@@ -179,6 +185,11 @@ export class MaplibreEngine implements MapEngine {
       }
       this.markerLayers.delete(markerKey);
     }
+    // Bus listeners were attached on the (now-removed) marker DOM nodes.
+    // Maplibre's Marker.remove() detaches the elements from the DOM, but
+    // our listeners remain on the orphaned nodes — they'll be garbage
+    // collected when nothing else holds them. detachAll on destroy below
+    // handles the explicit teardown.
     const pathKey = PATH_LAYER_PREFIX + layerId;
     if (this.pathLayers.has(pathKey)) {
       if (map.getLayer(pathKey)) {
@@ -208,8 +219,41 @@ export class MaplibreEngine implements MapEngine {
     };
   }
 
+  onMarkerHover(cb: (e: MarkerEvent | null) => void): Unsubscribe {
+    return this.events.onHover(cb);
+  }
+
+  onMarkerClick(cb: (e: MarkerEvent) => void): Unsubscribe {
+    return this.events.onClick(cb);
+  }
+
+  setPopup(at: LatLng, el: HTMLElement, opts?: { offsetPx?: number }): void {
+    const map = this.requireMap();
+    if (this.popup !== null) {
+      this.popup.remove();
+      this.popup = null;
+    }
+    const popup = new maplibregl.Popup({
+      closeOnClick: false,
+      closeButton: false,
+      offset: opts?.offsetPx ?? 14,
+      maxWidth: "320px",
+    });
+    popup.setLngLat([at.lng, at.lat]).setDOMContent(el).addTo(map);
+    this.popup = popup;
+  }
+
+  clearPopup(): void {
+    if (this.popup !== null) {
+      this.popup.remove();
+      this.popup = null;
+    }
+  }
+
   destroy(): void {
     if (this.map !== null) {
+      this.events.detachAll();
+      this.clearPopup();
       for (const { instances } of this.markerLayers.values()) {
         for (const m of instances) {
           m.remove();
