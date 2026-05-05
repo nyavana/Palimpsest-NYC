@@ -107,6 +107,8 @@ services:
       - /opt/venv/bin/python
       - -m
       - worker.main
+    healthcheck:
+      disable: true
     restart: unless-stopped
 
   web:
