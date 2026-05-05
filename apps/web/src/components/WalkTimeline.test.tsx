@@ -115,8 +115,10 @@ describe("WalkTimeline", () => {
     expect(items).toHaveLength(STEP_FIXTURES.length);
     // First instruction surfaced verbatim
     expect(within(items[0]).getByText(/Head east on West 110th Street/)).toBeInTheDocument();
-    // Per-step distance label is rendered in the right gutter
-    expect(within(items[0]).getByText(/80 m/)).toBeInTheDocument();
+    // Per-step distance label is rendered in the right gutter (the
+    // standalone "80 m" span — anchored so it does not match the same
+    // distance embedded in the instruction text).
+    expect(within(items[0]).getByText(/^80 m$/)).toBeInTheDocument();
 
     // aria-expanded flips to true after the click
     expect(trigger).toHaveAttribute("aria-expanded", "true");
