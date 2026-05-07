@@ -14,7 +14,7 @@ type Props = {
 };
 
 export function NarrationStream({ state }: Props) {
-  const { status, turn, lastToolCall, narration, question } = state;
+  const { history, status, turn, lastToolCall, narration, question } = state;
 
   if (status === "idle") {
     return (
@@ -43,17 +43,34 @@ export function NarrationStream({ state }: Props) {
         )}
       </div>
 
-      {question !== null && (
-        <p className="font-serif text-small italic text-ink-soft">&ldquo;{question}&rdquo;</p>
+      {history.length > 0 && (
+        <ol className="space-y-3 border-b border-hairline pb-3">
+          {history.map((entry, idx) => (
+            <li key={`${idx}:${entry.question}`} className="space-y-1">
+              <p className="font-serif text-small italic text-ink-soft">
+                &ldquo;{entry.question}&rdquo;
+              </p>
+              <p className="max-w-prose whitespace-pre-line font-serif text-small leading-relaxed text-ink">
+                {entry.narration}
+              </p>
+            </li>
+          ))}
+        </ol>
       )}
 
-      {narration.length === 0 && (status === "asking" || status === "streaming") ? (
-        <LoadingSkeleton />
-      ) : narration.length > 0 ? (
-        <p className="max-w-prose whitespace-pre-line font-serif text-body leading-relaxed text-ink">
-          {narration}
-        </p>
-      ) : null}
+      {question !== null && (
+        <div className="space-y-3">
+          <p className="font-serif text-small italic text-ink-soft">&ldquo;{question}&rdquo;</p>
+
+          {narration.length === 0 && (status === "asking" || status === "streaming") ? (
+            <LoadingSkeleton />
+          ) : narration.length > 0 ? (
+            <p className="max-w-prose whitespace-pre-line font-serif text-body leading-relaxed text-ink">
+              {narration}
+            </p>
+          ) : null}
+        </div>
+      )}
     </section>
   );
 }

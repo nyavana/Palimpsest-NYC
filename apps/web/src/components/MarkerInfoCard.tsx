@@ -11,16 +11,25 @@ import { sourceTypeColor } from "@/styles/tokens";
 import type { Citation, PlannedStop } from "@/state/types";
 import { useWikipediaSummary } from "@/state/useWikipediaSummary";
 
-import { ExternalLinkIcon } from "./Icon";
+import { EyeIcon, ExternalLinkIcon } from "./Icon";
 
 type Props = {
   variant: "hover" | "pinned";
   stop: PlannedStop;
   citation: Citation | null;
   onClose: () => void;
+  onRevealCitation?: () => void;
+  bodyText?: string | null;
 };
 
-export function MarkerInfoCard({ variant, stop, citation, onClose }: Props) {
+export function MarkerInfoCard({
+  variant,
+  stop,
+  citation,
+  onClose,
+  onRevealCitation,
+  bodyText,
+}: Props) {
   if (variant === "hover") {
     return (
       <div className="flex max-w-[220px] items-center gap-2 rounded border border-hairline bg-parchment px-3 py-2 shadow-md">
@@ -58,10 +67,20 @@ export function MarkerInfoCard({ variant, stop, citation, onClose }: Props) {
         </div>
       )}
 
-      <PinnedBody stop={stop} citation={citation} />
+      <PinnedBody stop={stop} citation={citation} bodyText={bodyText} />
 
       {citation !== null && (
-        <footer>
+        <footer className="flex items-center gap-2">
+          {onRevealCitation !== undefined && (
+            <button
+              type="button"
+              onClick={onRevealCitation}
+              className="inline-flex items-center gap-1 rounded border border-hairline px-2 py-1 font-serif text-small text-ink-soft transition-colors hover:bg-parchment-deep focus:outline-none focus:ring-2 focus:ring-ink/40"
+            >
+              <EyeIcon className="text-small" />
+              Reveal citation
+            </button>
+          )}
           <a
             href={citation.source_url}
             target="_blank"
@@ -84,12 +103,23 @@ function NumberBadge({ index }: { index: number }) {
   );
 }
 
-function PinnedBody({ stop, citation }: { stop: PlannedStop; citation: Citation | null }) {
+function PinnedBody({
+  stop,
+  citation,
+  bodyText,
+}: {
+  stop: PlannedStop;
+  citation: Citation | null;
+  bodyText?: string | null;
+}) {
   const isWikipedia = stop.doc_id.startsWith("wikipedia:");
   const fetchState = useWikipediaSummary(isWikipedia ? stop.doc_id : null);
 
   if (citation === null) {
-    return null;
+    if (bodyText === undefined || bodyText === null || bodyText.trim().length === 0) {
+      return null;
+    }
+    return <p className="font-serif text-small leading-snug text-ink-soft">{bodyText}</p>;
   }
 
   if (isWikipedia) {

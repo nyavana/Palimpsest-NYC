@@ -24,6 +24,7 @@ import { useState } from "react";
 
 import type { PlannedRoute, PlannedStop, RouteLeg } from "@/state/types";
 import { useMapEngineHandle } from "@/state/MapEngineContext";
+import { useTourFocus } from "@/state/TourFocusContext";
 import { WALK_MS_PER_STEP } from "@/styles/tokens";
 
 import { ChevronRightIcon, CrosshairIcon } from "./Icon";
@@ -62,7 +63,7 @@ function formatTotals(distanceM: number, durationS: number): string {
 
 export function WalkTimeline({ walk }: Props) {
   const handle = useMapEngineHandle();
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const { focus, focusDocId } = useTourFocus();
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   if (walk === null || walk.stops.length === 0) return null;
@@ -75,7 +76,7 @@ export function WalkTimeline({ walk }: Props) {
   const flyTo = (stop: PlannedStop) => {
     const engine = handle.get();
     if (engine === null) return;
-    setActiveIndex(stop.index);
+    focusDocId(stop.doc_id);
     void engine.flyTo(
       {
         center: { lat: stop.lat, lng: stop.lon },
@@ -102,7 +103,7 @@ export function WalkTimeline({ walk }: Props) {
       </header>
       <ol className="space-y-1">
         {stops.map((stop) => {
-          const active = stop.index === activeIndex;
+          const active = stop.doc_id === focus.docId;
           const expanded = stop.index === expandedIndex;
           // Stop 0 has no incoming leg; for index >= 1 we look up legs[i-1].
           // If the routed-tool result didn't include legs (legacy V1 walk),

@@ -16,7 +16,11 @@ import {
   encodeCredentialsHeader,
   type LlmCredentials,
 } from "./llmCredentials";
-import type { SseEventName, SsePayloads } from "./types";
+import type {
+  ConversationHistoryMessage,
+  SseEventName,
+  SsePayloads,
+} from "./types";
 
 export type SseHandlers = {
   [K in SseEventName]?: (payload: SsePayloads[K]) => void;
@@ -29,6 +33,7 @@ export type SseSession = {
 export type OpenAgentStreamOptions = {
   baseUrl?: string;
   credentials?: LlmCredentials | null;
+  history?: ConversationHistoryMessage[];
   onError?: (err: unknown) => void;
 };
 
@@ -54,7 +59,12 @@ export function openAgentStream(
       const resp = await fetch(url, {
         method: "POST",
         headers,
-        body: JSON.stringify({ q: question }),
+        body: JSON.stringify({
+          q: question,
+          ...(options.history !== undefined && options.history.length > 0
+            ? { history: options.history }
+            : {}),
+        }),
         signal: controller.signal,
       });
 

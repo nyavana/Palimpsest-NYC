@@ -4,6 +4,7 @@
  */
 
 import type { Citation, PlannedRoute } from "@/state/types";
+import { useTourFocus } from "@/state/TourFocusContext";
 
 import { CitationCard } from "./CitationCard";
 
@@ -14,6 +15,8 @@ type Props = {
 };
 
 export function CitationList({ citations, walk, verified }: Props) {
+  const { focus, focusDocId } = useTourFocus();
+
   if (citations.length === 0) {
     return null;
   }
@@ -21,6 +24,7 @@ export function CitationList({ citations, walk, verified }: Props) {
   // Best-effort: pull human-readable place names from the walk stops so the
   // citation card can show a real title rather than a slugified doc_id.
   const titles = new Map((walk?.stops ?? []).map((s) => [s.doc_id, s.name] as const));
+  const stopDocIds = new Set((walk?.stops ?? []).map((s) => s.doc_id));
 
   return (
     <section className="space-y-3 border-t border-hairline px-4 py-4">
@@ -40,7 +44,13 @@ export function CitationList({ citations, walk, verified }: Props) {
       <ul className="space-y-2">
         {citations.map((c) => (
           <li key={`${c.doc_id}#${c.retrieval_turn}#${c.span}`}>
-            <CitationCard citation={c} title={titles.get(c.doc_id)} />
+            <CitationCard
+              citation={c}
+              title={titles.get(c.doc_id)}
+              active={focus.docId === c.doc_id}
+              focusVersion={focus.version}
+              onFocus={stopDocIds.has(c.doc_id) ? () => focusDocId(c.doc_id) : undefined}
+            />
           </li>
         ))}
       </ul>

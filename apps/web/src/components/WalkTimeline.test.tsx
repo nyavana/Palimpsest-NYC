@@ -16,6 +16,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 
 import type { PlannedRoute } from "@/state/types";
 import { MapEngineProvider } from "@/state/MapEngineContext";
+import { TourFocusProvider } from "@/state/TourFocusContext";
 
 import { WalkTimeline } from "./WalkTimeline";
 
@@ -61,9 +62,11 @@ function fakeRoute(overrides: Partial<PlannedRoute> = {}): PlannedRoute {
 
 function renderWithProvider(walk: PlannedRoute | null) {
   return render(
-    <MapEngineProvider>
-      <WalkTimeline walk={walk} />
-    </MapEngineProvider>,
+    <TourFocusProvider>
+      <MapEngineProvider>
+        <WalkTimeline walk={walk} />
+      </MapEngineProvider>
+    </TourFocusProvider>,
   );
 }
 
@@ -90,9 +93,11 @@ describe("WalkTimeline", () => {
     expect(screen.getByText(/tsp-optimized/i)).toBeInTheDocument();
 
     rerender(
-      <MapEngineProvider>
-        <WalkTimeline walk={fakeRoute({ stop_ordering: "input_order" })} />
-      </MapEngineProvider>,
+      <TourFocusProvider>
+        <MapEngineProvider>
+          <WalkTimeline walk={fakeRoute({ stop_ordering: "input_order" })} />
+        </MapEngineProvider>
+      </TourFocusProvider>,
     );
     expect(screen.queryByText(/tsp-optimized/i)).not.toBeInTheDocument();
   });

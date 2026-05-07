@@ -26,8 +26,9 @@ import { createPortal } from "react-dom";
 import { DEFAULT_VIEWPORT, createMapEngine, type MapEngine } from "@/map";
 import type { LatLng, MarkerEvent, Viewport } from "@/map";
 import type { PathStyle } from "@/map/types";
-import type { Citation, PlannedRoute } from "@/state/types";
+import type { Citation, FoodCandidate, PlannedRoute, PlannedStop } from "@/state/types";
 import { useMapEngineHandle } from "@/state/MapEngineContext";
+import { useTourFocus } from "@/state/TourFocusContext";
 
 import { MarkerInfoCard } from "./MarkerInfoCard";
 import {
@@ -38,9 +39,12 @@ import {
 } from "./MapViewModeToggle";
 
 const WALK_LAYER = "walk";
+const FOOD_LAYER = "food-candidates";
 const PATH_COLOR = "#5364C0"; // tokens.palette["archival-blue"] — royal indigo
 const FALLBACK_PATH_COLOR = "#6A6F8C"; // tokens.palette["ink-muted"] — cool gray
 const MARKER_COLOR = "#77295D"; // tokens.palette.oxblood — plum
+const ACTIVE_MARKER_COLOR = "#5364C0"; // archival-blue
+const FOOD_MARKER_COLOR = "#A35A17"; // warm ochre for food candidates
 const FLYTO_DURATION_MS = 1200;
 const TOGGLE_FLY_MS = 600;
 const PINNED_FLY_MIN_ZOOM = 17.5;
@@ -48,6 +52,7 @@ const PINNED_FLY_MIN_ZOOM = 17.5;
 type Props = {
   walk: PlannedRoute | null;
   citations: Citation[];
+  candidates: FoodCandidate[];
 };
 
 type MarkerFocus =
@@ -61,6 +66,13 @@ function pitchForMode(mode: MapViewMode): number {
 
 function parseStopIndex(markerId: string): number | null {
   const m = /^stop-(\d+)$/.exec(markerId);
+  if (m === null) return null;
+  const n = Number.parseInt(m[1], 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+function parseCandidateIndex(markerId: string): number | null {
+  const m = /^food-(\d+)$/.exec(markerId);
   if (m === null) return null;
   const n = Number.parseInt(m[1], 10);
   return Number.isFinite(n) ? n : null;
@@ -80,12 +92,14 @@ function stopsToLatLng(walk: PlannedRoute): LatLng[] {
   return walk.stops.map((s) => ({ lat: s.lat, lng: s.lon }));
 }
 
-export function MapView({ walk, citations }: Props) {
+export function MapView({ walk, citations, candidates }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const popupHostRef = useRef<HTMLDivElement | null>(null);
   const cameraRef = useRef<Viewport>({ ...DEFAULT_VIEWPORT });
   const engineRef = useRef<MapEngine | null>(null);
+  const lastCandidateSignatureRef = useRef<string>("");
   const handle = useMapEngineHandle();
+  const { focus: tourFocus, focusDocId } = useTourFocus();
   const [ready, setReady] = useState(false);
   const [focus, setFocus] = useState<MarkerFocus>({ kind: "idle" });
   const [viewMode, setViewMode] = useState<MapViewMode>(() => readSavedViewMode());
@@ -103,6 +117,14 @@ export function MapView({ walk, citations }: Props) {
     }
     return m;
   }, [citations]);
+  const stopByDocId = useMemo(
+    () => new Map((walk?.stops ?? []).map((s) => [s.doc_id, s] as const)),
+    [walk],
+  );
+  const candidateByDocId = useMemo(
+    () => new Map(candidates.map((candidate) => [candidate.doc_id, candidate] as const)),
+    [candidates],
+  );
 
   // Engine lifecycle.
   useEffect(() => {
@@ -159,17 +181,19 @@ export function MapView({ walk, citations }: Props) {
     });
 
     const offClick = engine.onMarkerClick((e) => {
+      const stopIdx = parseStopIndex(e.markerId);
+      const stop = stopIdx === null ? null : walk?.stops.find((s) => s.index === stopIdx) ?? null;
+      if (stop !== null) {
+        focusDocId(stop.doc_id);
+        return;
+      }
+      const candidateIndex = parseCandidateIndex(e.markerId);
+      const candidate = candidateIndex === null ? null : candidates[candidateIndex] ?? null;
+      if (candidate !== null) {
+        focusDocId(candidate.doc_id);
+        return;
+      }
       setFocus({ kind: "pinned", markerId: e.markerId, at: e.at });
-      const cur = cameraRef.current;
-      void engine.flyTo(
-        {
-          center: e.at,
-          zoom: Math.max(cur.zoom, PINNED_FLY_MIN_ZOOM),
-          pitch: cur.pitch ?? pitchForMode(viewMode),
-          bearing: cur.bearing,
-        },
-        FLYTO_DURATION_MS,
-      );
     });
 
     return () => {
@@ -177,7 +201,7 @@ export function MapView({ walk, citations }: Props) {
       offHover();
       offClick();
     };
-  }, [ready, viewMode]);
+  }, [candidates, focusDocId, ready, walk]);
 
   // Escape dismisses pinned popup.
   useEffect(() => {
@@ -206,7 +230,43 @@ export function MapView({ walk, citations }: Props) {
   // Reset focus and clear popup whenever the walk changes.
   useEffect(() => {
     setFocus({ kind: "idle" });
-  }, [walk]);
+  }, [candidates, walk]);
+
+  useEffect(() => {
+    if (!ready) return;
+    if (tourFocus.docId === null) return;
+    const stop = stopByDocId.get(tourFocus.docId);
+    const candidate = candidateByDocId.get(tourFocus.docId);
+    if (stop === undefined && candidate === undefined) return;
+    const fallbackCandidate = candidate ?? null;
+    const candidateIndex =
+      fallbackCandidate === null
+        ? -1
+        : candidates.findIndex((entry) => entry.doc_id === fallbackCandidate.doc_id);
+
+    const at =
+      stop !== undefined
+        ? { lat: stop.lat, lng: stop.lon }
+        : { lat: fallbackCandidate!.lat, lng: fallbackCandidate!.lon };
+    setFocus({
+      kind: "pinned",
+      markerId: stop !== undefined ? `stop-${stop.index}` : `food-${Math.max(candidateIndex, 0)}`,
+      at,
+    });
+
+    const engine = engineRef.current;
+    if (engine === null) return;
+    const cur = cameraRef.current;
+    void engine.flyTo(
+      {
+        center: at,
+        zoom: Math.max(cur.zoom, PINNED_FLY_MIN_ZOOM),
+        pitch: cur.pitch ?? pitchForMode(viewMode),
+        bearing: cur.bearing,
+      },
+      FLYTO_DURATION_MS,
+    );
+  }, [candidateByDocId, candidates, ready, stopByDocId, tourFocus.docId, tourFocus.version, viewMode]);
 
   // Draw / clear the walk layer whenever the walk frame changes.
   useEffect(() => {
@@ -243,7 +303,7 @@ export function MapView({ walk, citations }: Props) {
         id: `stop-${s.index}`,
         position: { lat: s.lat, lng: s.lon },
         label: `${s.index + 1}. ${s.name}`,
-        color: MARKER_COLOR,
+        color: s.doc_id === tourFocus.docId ? ACTIVE_MARKER_COLOR : MARKER_COLOR,
       })),
     );
 
@@ -256,7 +316,57 @@ export function MapView({ walk, citations }: Props) {
         FLYTO_DURATION_MS,
       );
     }
-  }, [walk, ready, viewMode]);
+  }, [tourFocus.docId, walk, ready, viewMode]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const engine = engineRef.current;
+    if (engine === null) return;
+
+    if (candidates.length === 0) {
+      engine.clearLayer(FOOD_LAYER);
+      return;
+    }
+
+    engine.addMarkers(
+      FOOD_LAYER,
+      candidates.map((candidate, index) => ({
+        id: `food-${index}`,
+        position: { lat: candidate.lat, lng: candidate.lon },
+        label: candidate.name,
+        color: candidate.doc_id === tourFocus.docId ? ACTIVE_MARKER_COLOR : FOOD_MARKER_COLOR,
+      })),
+    );
+  }, [candidates, ready, tourFocus.docId]);
+
+  useEffect(() => {
+    if (!ready) return;
+    if (candidates.length === 0) {
+      lastCandidateSignatureRef.current = "";
+      return;
+    }
+
+    const signature = candidates.map((candidate) => candidate.doc_id).join("|");
+    if (signature === lastCandidateSignatureRef.current) return;
+    lastCandidateSignatureRef.current = signature;
+
+    const first = candidates[0];
+    const at = { lat: first.lat, lng: first.lon };
+    setFocus({ kind: "pinned", markerId: "food-0", at });
+
+    const engine = engineRef.current;
+    if (engine === null) return;
+    const cur = cameraRef.current;
+    void engine.flyTo(
+      {
+        center: at,
+        zoom: Math.max(cur.zoom, 16.25),
+        pitch: cur.pitch ?? pitchForMode(viewMode),
+        bearing: cur.bearing,
+      },
+      FLYTO_DURATION_MS,
+    );
+  }, [candidates, ready, viewMode]);
 
   const handleViewModeChange = (next: MapViewMode) => {
     setViewMode(next);
@@ -273,12 +383,33 @@ export function MapView({ walk, citations }: Props) {
   // Resolve focused stop & citation for the popup.
   const focusedStopIndex =
     focus.kind === "idle" ? null : parseStopIndex(focus.markerId);
+  const focusedCandidateIndex =
+    focus.kind === "idle" ? null : parseCandidateIndex(focus.markerId);
   const focusedStop =
     focusedStopIndex === null
       ? null
       : walk?.stops.find((s) => s.index === focusedStopIndex) ?? null;
+  const focusedCandidate =
+    focusedCandidateIndex === null ? null : candidates[focusedCandidateIndex] ?? null;
   const focusedCitation =
     focusedStop === null ? null : citationByDocId.get(focusedStop.doc_id) ?? null;
+  const focusedPopupStop: PlannedStop | null =
+    focusedStop ??
+    (focusedCandidate === null
+      ? null
+      : {
+          index: focusedCandidateIndex ?? 0,
+          doc_id: focusedCandidate.doc_id,
+          name: focusedCandidate.name,
+          lat: focusedCandidate.lat,
+          lon: focusedCandidate.lon,
+        });
+  const focusedBodyText =
+    focusedCandidate === null
+      ? null
+      : [focusedCandidate.cuisine?.replace(/;/g, ", "), focusedCandidate.why]
+          .filter((part): part is string => part !== undefined && part !== null && part.length > 0)
+          .join(" - ");
 
   return (
     <>
@@ -288,13 +419,17 @@ export function MapView({ walk, citations }: Props) {
           <MapViewModeToggle mode={viewMode} onChange={handleViewModeChange} />
         </div>
       </div>
-      {focus.kind !== "idle" && focusedStop !== null && popupHostRef.current !== null
+      {focus.kind !== "idle" && focusedPopupStop !== null && popupHostRef.current !== null
         ? createPortal(
             <MarkerInfoCard
               variant={focus.kind === "pinned" ? "pinned" : "hover"}
-              stop={focusedStop}
+              stop={focusedPopupStop}
               citation={focusedCitation}
+              bodyText={focusedBodyText}
               onClose={() => setFocus({ kind: "idle" })}
+              onRevealCitation={
+                focusedCitation !== null ? () => focusDocId(focusedPopupStop.doc_id) : undefined
+              }
             />,
             popupHostRef.current,
           )
