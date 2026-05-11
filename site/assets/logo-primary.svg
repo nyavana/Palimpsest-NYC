@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" width="320" height="80">
+  
+  <defs>
+    
+  </defs>
+
+  
+  <g transform="translate(8 10)" fill="none" stroke="#5364C0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    
+    <path d="M2 50 C 12 38, 22 34, 32 38 S 52 50, 60 42 S 70 24, 56 18"></path>
+    
+    <path d="M8 50 C 16 42, 24 40, 32 42 S 46 50, 54 44 S 62 30, 52 24" opacity="0.55"></path>
+    
+    <path d="M16 50 C 22 46, 28 46, 32 46 S 42 48, 48 44" opacity="0.3"></path>
+  </g>
+  
+  <g transform="translate(40 18)" fill="#C34FA2" stroke="#C34FA2">
+    <path d="M8 0 C 3.5 0, 0 3.5, 0 8 C 0 14, 8 22, 8 22 C 8 22, 16 14, 16 8 C 16 3.5, 12.5 0, 8 0 Z"></path>
+    <circle cx="8" cy="8" r="2.6" fill="#EDF1FD" stroke="none"></circle>
+  </g>
+
+  
+  <text x="86" y="44" font-family="Cormorant Garamond, Garamond, Georgia, serif" font-weight="700" font-size="34" fill="#5364C0">Palimpsest</text>
+  <text x="86" y="64" font-family="Inter, sans-serif" font-weight="600" font-size="10" letter-spacing="2" fill="#C34FA2">N Y C  ·  W A L K I N G   T O U R S</text>
+</svg>

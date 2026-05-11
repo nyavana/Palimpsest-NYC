@@ -1,0 +1,25 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <g stroke="#5364C0" stroke-width="0.5" fill="none" opacity="0.22">
+    
+    <line x1="40" y1="0" x2="40" y2="320"></line>
+    <line x1="100" y1="0" x2="100" y2="320"></line>
+    <line x1="160" y1="0" x2="160" y2="320"></line>
+    <line x1="220" y1="0" x2="220" y2="320"></line>
+    <line x1="280" y1="0" x2="280" y2="320"></line>
+    
+    <g transform="rotate(-29 160 160)">
+      <line x1="-100" y1="20" x2="420" y2="20"></line>
+      <line x1="-100" y1="50" x2="420" y2="50"></line>
+      <line x1="-100" y1="80" x2="420" y2="80"></line>
+      <line x1="-100" y1="110" x2="420" y2="110"></line>
+      <line x1="-100" y1="140" x2="420" y2="140"></line>
+      <line x1="-100" y1="170" x2="420" y2="170"></line>
+      <line x1="-100" y1="200" x2="420" y2="200"></line>
+      <line x1="-100" y1="230" x2="420" y2="230"></line>
+      <line x1="-100" y1="260" x2="420" y2="260"></line>
+      <line x1="-100" y1="290" x2="420" y2="290"></line>
+      <line x1="-100" y1="320" x2="420" y2="320"></line>
+    </g>
+  </g>
+</svg>

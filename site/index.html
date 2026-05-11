@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Palimpsest NYC — an illuminated atlas, narrated by an agent</title>
+  <meta name="description" content="An agentic walking tour of Morningside Heights and the Upper West Side, grounded in public-domain archives. A Columbia EECS E6895 final project." />
+
+  <link rel="icon" type="image/svg+xml" href="assets/logo-mark.svg" />
+  <link rel="stylesheet" href="styles/tokens.css" />
+  <link rel="stylesheet" href="styles/site.css" />
+</head>
+<body>
+
+  <!-- =========================================================
+       COORDINATE TICKER (top strip — engineer flavour)
+       ========================================================= -->
+  <div class="coord-ticker">
+    <div class="container" style="display: flex; align-items: center; gap: 16px; width: 100%;">
+      <span class="pulse" aria-hidden="true"></span>
+      <span>40° 48′ 32″ N&nbsp;&nbsp;·&nbsp;&nbsp;73° 57′ 41″ W</span>
+      <span class="sep">/</span>
+      <span>bbox <code style="background:none;padding:0;color:var(--ink-2);">[-73.985,40.795,-73.945,40.825]</code></span>
+      <span class="sep" style="margin-left:auto;">/</span>
+      <span id="commitRef">commit&nbsp;<code style="background:none;padding:0;color:var(--magenta);">837f98e</code></span>
+      <span class="sep">/</span>
+      <span>built&nbsp;<span style="color:var(--ink-2);">May&nbsp;2026</span></span>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       NAV
+       ========================================================= -->
+  <nav class="nav" id="nav">
+    <div class="container nav-inner">
+      <a class="nav-logo" href="#top" aria-label="Palimpsest NYC home" style="border-bottom:none;">
+        <img src="assets/logo-primary.svg" alt="Palimpsest NYC" />
+      </a>
+      <div class="nav-links">
+        <a href="#problem">Problem</a>
+        <a href="#demo">Demo</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#sources">Sources</a>
+        <a href="#team">Team</a>
+        <a class="nav-cta" href="https://github.com/nyavana/Palimpsest-NYC" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.71.08-.71 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.18 1.18a11.04 11.04 0 0 1 5.79 0c2.21-1.49 3.18-1.18 3.18-1.18.62 1.58.23 2.75.11 3.04.73.81 1.18 1.84 1.18 3.1 0 4.42-2.69 5.4-5.25 5.69.41.36.78 1.06.78 2.14v3.17c0 .31.21.68.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <span id="top"></span>
+
+  <!-- =========================================================
+       HERO
+       ========================================================= -->
+  <header class="hero">
+    <div class="hero-bg"></div>
+    <div class="container hero-grid">
+      <div>
+        <div class="eyebrow-row">
+          <span class="tick" aria-hidden="true"></span>
+          <span class="eyebrow" style="color:var(--magenta);">Columbia EECS E6895 · Final Project · 2026</span>
+        </div>
+
+        <h1 class="hero-title">
+          An <em>illuminated&nbsp;atlas</em><br/>
+          of the city,<br/>
+          <span class="accent">narrated</span> by&nbsp;an&nbsp;agent.
+        </h1>
+
+        <p class="hero-sub">
+          Palimpsest plans a short walking tour for a bounded slice of Manhattan
+          and narrates it from free public-domain sources — every claim cited
+          back to a retrieved document, verified at generation time.
+        </p>
+
+        <div class="hero-cta-row">
+          <a class="btn btn-primary" href="#demo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Watch a tour
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/nyavana/Palimpsest-NYC" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.71.08-.71 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.18 1.18a11.04 11.04 0 0 1 5.79 0c2.21-1.49 3.18-1.18 3.18-1.18.62 1.58.23 2.75.11 3.04.73.81 1.18 1.84 1.18 3.1 0 4.42-2.69 5.4-5.25 5.69.41.36.78 1.06.78 2.14v3.17c0 .31.21.68.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>
+            Read the source
+          </a>
+        </div>
+
+        <div class="hero-meta">
+          <span class="pill"><span class="dot"></span>v1 — Wikipedia + OSM</span>
+          <span class="pill"><span class="dot cobalt"></span>120 unit tests, all green</span>
+          <span class="pill"><span class="dot sky"></span>pgvector + PostGIS</span>
+          <span class="pill"><span class="dot plum"></span>Anthropic Claude</span>
+        </div>
+      </div>
+
+      <!-- Atlas widget -->
+      <div class="atlas" aria-hidden="true">
+        <div class="atlas-header">
+          <div class="dots"><span></span><span></span><span></span></div>
+          <div class="title">palimpsest.app — /walk?near=columbia</div>
+          <div class="badge"><span class="live-dot"></span>Live</div>
+        </div>
+        <div class="atlas-map" id="atlasMap">
+          <!-- Contour lines -->
+          <svg class="contours" viewBox="0 0 600 412" preserveAspectRatio="none">
+            <g fill="none" stroke="#5364C0" stroke-width="0.9" opacity="0.32" stroke-linecap="round">
+              <path d="M-20 60 C 80 50, 180 70, 280 60 S 480 30, 620 60"/>
+              <path d="M-20 110 C 90 100, 200 130, 300 115 S 500 80, 620 115"/>
+              <path d="M-20 170 C 100 160, 220 195, 330 170 S 520 140, 620 175" opacity="0.7"/>
+              <path d="M-20 250 C 110 240, 240 280, 360 250 S 540 220, 620 255" opacity="0.5"/>
+              <path d="M-20 330 C 120 320, 260 360, 380 330 S 560 300, 620 335" opacity="0.35"/>
+            </g>
+            <g fill="none" stroke="#5364C0" stroke-width="0.6" opacity="0.5" stroke-dasharray="3 4">
+              <!-- Manhattan grid hint - avenues -->
+              <line x1="120" y1="0" x2="120" y2="412"/>
+              <line x1="240" y1="0" x2="240" y2="412"/>
+              <line x1="360" y1="0" x2="360" y2="412"/>
+              <line x1="480" y1="0" x2="480" y2="412"/>
+            </g>
+            <!-- Park outline (Morningside park-ish) -->
+            <path d="M460 80 L505 75 L515 240 L495 360 L450 370 L440 200 Z"
+                  fill="rgba(119, 183, 240, 0.18)" stroke="#5AA1E0" stroke-width="1.1" stroke-dasharray="2 3" opacity="0.7"/>
+            <!-- Walk path (will be revealed via animation) -->
+            <path id="walkPath" class="walk-path draw"
+                  d="M 165 285 C 200 250, 230 220, 265 200 S 320 180, 360 170 S 420 145, 455 130" />
+          </svg>
+
+          <!-- Pins -->
+          <div class="pin plum"  style="left: 27.5%; top: 69.2%; animation-delay: 0.4s;"></div>
+          <span class="pin-label" style="left: 28.5%; top: 73.5%; animation-delay: 0.6s;">Riverside Church</span>
+
+          <div class="pin cobalt" style="left: 44%; top: 49%; animation-delay: 1.0s;"></div>
+          <span class="pin-label" style="left: 45%; top: 53%; animation-delay: 1.2s;">Low Library</span>
+
+          <div class="pin magenta" style="left: 60%; top: 41.2%; animation-delay: 1.6s;"></div>
+          <span class="pin-label" style="left: 61%; top: 45.5%; animation-delay: 1.8s;">Cathedral of St. John</span>
+
+          <div class="pin sky" style="left: 76%; top: 31.5%; animation-delay: 2.2s;"></div>
+          <span class="pin-label" style="left: 77%; top: 35.5%; animation-delay: 2.4s;">Morningside Park</span>
+        </div>
+
+        <div class="atlas-stream" id="atlasStream">
+          <!-- populated by JS -->
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- =========================================================
+       PROBLEM
+       ========================================================= -->
+  <section class="section rule-section" id="problem">
+    <div class="container">
+      <div class="section-head">
+        <div>
+          <span class="index">§01 · the&nbsp;problem</span>
+          <h2>Why<br/>this matters.</h2>
+        </div>
+        <div class="deck">
+          A large language model will tell you Riverside Church is a thirteenth-century
+          gothic cathedral with absolute confidence. It isn't. Hallucinations about
+          places — names, dates, who built what — are a citation problem, not a
+          model-scale problem.
+        </div>
+      </div>
+
+      <div class="manifesto">
+        <div>
+          <p class="manifesto-quote">
+            “LLMs are confident liars about&nbsp;places.”
+          </p>
+          <div class="manifesto-body">
+            <p>
+              The fix is not a bigger model. The fix is a <strong>retrieval contract</strong>
+              that refuses to render a sentence the model can't ground in a real document
+              from a real source — and a UI that shows the user exactly which document.
+            </p>
+            <p>
+              Palimpsest treats narration the way an academic treats a footnote:
+              every assertion is anchored to a <code>doc_id</code>, a paragraph offset,
+              a source feed, and a retrieval score. The verifier rejects any sentence
+              that fails the contract. The frontend renders the citation as a chip you
+              can click.
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <div class="faux-output">
+            <span class="label bad">unconstrained · gpt-style</span>
+            <p style="margin:0;">
+              Riverside Church, completed in <span class="strike">1192</span>,
+              was funded by <span class="strike">Andrew Carnegie</span> and houses the
+              <span class="strike">oldest bell carillon in North America</span>.
+              Martin Luther King Jr. delivered his &ldquo;Beyond Vietnam&rdquo; speech here in
+              <span class="strike">1965</span>.
+            </p>
+          </div>
+
+          <div class="faux-output good">
+            <span class="label">palimpsest · v1</span>
+            <p style="margin:0;">
+              Riverside Church, completed in <span class="corr">1930</span><span class="cite">wiki·p3</span>,
+              was funded by <span class="corr">John D. Rockefeller&nbsp;Jr.</span><span class="cite">wiki·p4</span>
+              and houses the <span class="corr">Laura Spelman Rockefeller Memorial Carillon</span><span class="cite">wiki·p7</span>.
+              King delivered &ldquo;Beyond Vietnam&rdquo; here in <span class="corr">1967</span><span class="cite">wiki·p11</span>.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       LIVE DEMO (chat + map)
+       ========================================================= -->
+  <section class="section rule-section" id="demo">
+    <div class="container">
+      <div class="section-head">
+        <div>
+          <span class="index">§02 · the&nbsp;product</span>
+          <h2>An agent<br/>that walks<br/>the&nbsp;page.</h2>
+        </div>
+        <div class="deck">
+          Tell it where you want to go. It plans a route inside the bbox, queries each
+          stop against the corpus, narrates the walk, and lets you click any sentence
+          back to the source paragraph it came from.
+        </div>
+      </div>
+
+      <div class="demo" aria-label="Palimpsest product demo">
+
+        <div class="demo-chat">
+          <div class="demo-chat-header">
+            <span>a walk near Columbia</span>
+            <span class="live"><span class="dot"></span>streaming</span>
+          </div>
+          <div class="demo-chat-body" id="chatBody">
+            <!-- populated by JS -->
+          </div>
+          <form class="demo-chat-input" onsubmit="event.preventDefault();">
+            <input type="text" placeholder="Take me on a walk near Columbia…" />
+            <button type="submit">Ask</button>
+          </form>
+        </div>
+
+        <div class="demo-map" id="demoMap">
+          <svg class="contour-lines" viewBox="0 0 800 580" preserveAspectRatio="xMidYMid slice">
+            <g fill="none" stroke="#5364C0" stroke-linecap="round">
+              <path d="M-20 80 C 120 60, 260 100, 380 80 S 660 40, 820 80" stroke-width="1" opacity="0.32"/>
+              <path d="M-20 150 C 140 130, 280 175, 400 150 S 680 110, 820 150" stroke-width="1" opacity="0.28"/>
+              <path d="M-20 230 C 160 210, 300 260, 420 230 S 700 180, 820 230" stroke-width="0.9" opacity="0.22"/>
+              <path d="M-20 320 C 180 300, 320 360, 440 330 S 720 290, 820 330" stroke-width="0.9" opacity="0.2"/>
+              <path d="M-20 430 C 200 410, 340 470, 460 440 S 740 400, 820 440" stroke-width="0.8" opacity="0.18"/>
+              <path d="M-20 520 C 220 500, 360 560, 480 530 S 760 490, 820 530" stroke-width="0.8" opacity="0.15"/>
+            </g>
+            <g fill="none" stroke="#5364C0" stroke-width="0.5" opacity="0.3" stroke-dasharray="3 5">
+              <line x1="180" y1="0" x2="180" y2="580"/>
+              <line x1="340" y1="0" x2="340" y2="580"/>
+              <line x1="500" y1="0" x2="500" y2="580"/>
+              <line x1="660" y1="0" x2="660" y2="580"/>
+            </g>
+            <path d="M600 90 L660 80 L675 280 L660 460 L605 470 L595 270 Z"
+                  fill="rgba(119, 183, 240, 0.16)" stroke="#5AA1E0" stroke-width="1" stroke-dasharray="2 4" opacity="0.7"/>
+            <text x="615" y="270" font-family="Cormorant Garamond, serif" font-style="italic" font-size="14" fill="#5AA1E0" opacity="0.75">Morningside Pk.</text>
+
+            <!-- Walk path connecting the pins -->
+            <path class="walk-path" id="demoWalkPath"
+                  d="M 180 420 C 230 380, 270 340, 320 320 S 410 290, 460 270 S 540 240, 590 220" />
+
+            <!-- Compass -->
+            <g transform="translate(720, 510)" opacity="0.85">
+              <circle r="22" fill="rgba(248,250,254,0.85)" stroke="#5364C0" stroke-width="1"/>
+              <line x1="0" y1="-18" x2="0" y2="18" stroke="#5364C0" stroke-width="0.75"/>
+              <line x1="-18" y1="0" x2="18" y2="0" stroke="#5364C0" stroke-width="0.75"/>
+              <polygon points="0,-16 4,0 0,-10 -4,0" fill="#C34FA2"/>
+              <text x="0" y="-25" font-family="JetBrains Mono, mono" font-size="9" fill="#5364C0" text-anchor="middle">N</text>
+            </g>
+          </svg>
+
+          <div class="map-header">
+            <span class="title">Morningside Heights · Upper West Side</span>
+            <span class="scale">1 : 14 400</span>
+          </div>
+
+          <!-- Pins -->
+          <div class="pin wikipedia"  style="left: 22.5%; top: 72%;" data-name="Riverside Church"></div>
+          <span class="pin-label"     style="left: 24.5%; top: 70.5%;">Riverside Church</span>
+
+          <div class="pin osm active" style="left: 40%; top: 55%;"   data-name="Low Library"></div>
+          <span class="pin-label"     style="left: 42%; top: 53.5%;">Low Library</span>
+
+          <div class="pin magenta"    style="left: 57.5%; top: 46.5%;" data-name="Cathedral of St. John"></div>
+          <span class="pin-label"     style="left: 59.5%; top: 45%;">Cathedral of St. John</span>
+
+          <div class="pin nypl"       style="left: 73.5%; top: 38%;" data-name="Morningside Park"></div>
+          <span class="pin-label"     style="left: 75.5%; top: 36.5%;">Morningside Park</span>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       ARCHITECTURE
+       ========================================================= -->
+  <section class="section rule-section" id="architecture">
+    <div class="container">
+      <div class="section-head">
+        <div>
+          <span class="index">§03 · how it&nbsp;works</span>
+          <h2>Five pieces,<br/>each minimal.</h2>
+        </div>
+        <div class="deck">
+          A retrieval-augmented agent on top of a pgvector + PostGIS corpus.
+          The web shell streams server-sent events; the verifier holds the
+          line on every sentence. No tricks, no magic — just a small, honest
+          pipeline.
+        </div>
+      </div>
+
+      <div class="arch-diagram">
+        <svg viewBox="0 0 1080 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <marker id="arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#5364C0"/>
+            </marker>
+          </defs>
+
+          <g fill="none" stroke="#5364C0" stroke-width="1.5" stroke-linecap="round">
+            <!-- 5 boxes -->
+            <g>
+              <rect x="20" y="60" width="160" height="80" rx="8" fill="#F8FAFE"/>
+              <text x="100" y="86" font-family="Cormorant Garamond, serif" font-weight="700" font-size="18" fill="#5364C0" text-anchor="middle">Browser</text>
+              <text x="100" y="112" font-family="JetBrains Mono, mono" font-size="10" fill="#6B6086" text-anchor="middle">React · MapLibre</text>
+              <text x="100" y="126" font-family="JetBrains Mono, mono" font-size="10" fill="#6B6086" text-anchor="middle">TypeScript · Vite</text>
+            </g>
+
+            <g>
+              <rect x="230" y="60" width="160" height="80" rx="8" fill="#F8FAFE"/>
+              <text x="310" y="86" font-family="Cormorant Garamond, serif" font-weight="700" font-size="18" fill="#5364C0" text-anchor="middle">Agent</text>
+              <text x="310" y="112" font-family="JetBrains Mono, mono" font-size="10" fill="#6B6086" text-anchor="middle">Claude · FastAPI</text>
+              <text x="310" y="126" font-family="JetBrains Mono, mono" font-size="10" fill="#6B6086" text-anchor="middle">SSE streaming</text>
+            </g>
+
+            <g>
+              <rect x="440" y="60" width="160" height="80" rx="8" fill="#F8FAFE"/>
+              <text x="520" y="86" font-family="Cormorant Garamond, serif" font-weight="700" font-size="18" fill="#5364C0" text-anchor="middle">Tools</text>
+              <text x="520" y="112" font-family="JetBrains Mono, mono" font-size="10" fill="#6B6086" text-anchor="middle">search_places</text>
+              <text x="520" y="126" font-family="JetBrains Mono, mono" font-size="10" fill="#6B6086" text-anchor="middle">narrate · plan_walk</text>
+            </g>
+
+            <g>
+              <rect x="650" y="60" width="160" height="80" rx="8" fill="#F8FAFE"/>
+              <text x="730" y="86" font-family="Cormorant Garamond, serif" font-weight="700" font-size="18" fill="#5364C0" text-anchor="middle">Corpus</text>
+              <text x="730" y="112" font-family="JetBrains Mono, mono" font-size="10" fill="#6B6086" text-anchor="middle">pgvector · PostGIS</text>
+              <text x="730" y="126" font-family="JetBrains Mono, mono" font-size="10" fill="#6B6086" text-anchor="middle">928 places</text>
+            </g>
+
+            <g>
+              <rect x="860" y="60" width="200" height="80" rx="8" fill="#F8FAFE"/>
+              <text x="960" y="86" font-family="Cormorant Garamond, serif" font-weight="700" font-size="18" fill="#5364C0" text-anchor="middle">Verifier</text>
+              <text x="960" y="112" font-family="JetBrains Mono, mono" font-size="10" fill="#6B6086" text-anchor="middle">5-field citation</text>
+              <text x="960" y="126" font-family="JetBrains Mono, mono" font-size="10" fill="#6B6086" text-anchor="middle">contract check</text>
+            </g>
+
+            <!-- arrows -->
+            <line x1="184" y1="100" x2="226" y2="100" marker-end="url(#arrowhead)"/>
+            <line x1="394" y1="100" x2="436" y2="100" marker-end="url(#arrowhead)"/>
+            <line x1="604" y1="100" x2="646" y2="100" marker-end="url(#arrowhead)"/>
+            <line x1="814" y1="100" x2="856" y2="100" marker-end="url(#arrowhead)"/>
+
+            <!-- feedback loop -->
+            <path d="M 960 60 C 960 30, 100 30, 100 60" marker-end="url(#arrowhead)" stroke-dasharray="4 4" opacity="0.55"/>
+            <text x="530" y="22" font-family="Cormorant Garamond, serif" font-style="italic" font-size="13" fill="#77295D" text-anchor="middle">narration + citations stream back over SSE</text>
+          </g>
+
+          <!-- bottom hand-drawn squiggle for charm -->
+          <g fill="none" stroke="#5364C0" stroke-width="0.7" opacity="0.4" stroke-linecap="round">
+            <path d="M 20 175 C 100 170, 180 180, 260 175 S 420 170, 520 175 S 680 180, 780 175 S 940 170, 1060 175"/>
+          </g>
+        </svg>
+
+        <div class="arch-grid">
+          <div class="arch-card">
+            <span class="num">01</span>
+            <h4>Browser</h4>
+            <p>3D map on the left, chat pane on the right. React + Vite + TypeScript + MapLibre GL.</p>
+            <span class="tag">apps/web</span>
+          </div>
+          <div class="arch-card">
+            <span class="num">02</span>
+            <h4>Agent</h4>
+            <p>FastAPI service runs Claude in a tool-use loop and streams events back as SSE.</p>
+            <span class="tag">apps/agent</span>
+          </div>
+          <div class="arch-card">
+            <span class="num">03</span>
+            <h4>Tools</h4>
+            <p>Typed Pydantic schemas: <code style="font-size:11px;">search_places</code>, <code style="font-size:11px;">plan_walk</code>, <code style="font-size:11px;">narrate</code>.</p>
+            <span class="tag">apps/agent/tools</span>
+          </div>
+          <div class="arch-card">
+            <span class="num">04</span>
+            <h4>Corpus</h4>
+            <p>928 places — Wikipedia + OSM in v1 — embedded with pgvector, indexed with PostGIS.</p>
+            <span class="tag">data/corpus</span>
+          </div>
+          <div class="arch-card">
+            <span class="num">05</span>
+            <h4>Verifier</h4>
+            <p>Rejects any sentence missing a complete 5-field citation. Runs at generation time.</p>
+            <span class="tag">apps/agent/verify</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       NUMBERS
+       ========================================================= -->
+  <section class="section rule-section">
+    <div class="container">
+      <div class="section-head">
+        <div>
+          <span class="index">§04 · status</span>
+          <h2>By the<br/>numbers.</h2>
+        </div>
+        <div class="deck">
+          Milestone 1 ships <em class="serif-italic">bounded, demoable, online-only</em>.
+          The corpus is fully embedded, the contract is enforced, the verifier is green
+          against the test suite.
+        </div>
+      </div>
+
+      <div class="numbers">
+        <div class="num-block">
+          <div class="bignum" data-count="928">928</div>
+          <div class="label">places indexed</div>
+          <div class="desc">Wikipedia + OpenStreetMap, bounded to a tight Manhattan bbox.</div>
+        </div>
+        <div class="num-block">
+          <div class="bignum" data-count="120">120</div>
+          <div class="label">unit tests, all green</div>
+          <div class="desc">Pytest + a hand-rolled SSE replay harness for tool-call recordings.</div>
+        </div>
+        <div class="num-block">
+          <div class="bignum" data-count="100">100<span style="font-size:0.45em;color:var(--plum);">%</span></div>
+          <div class="label">embedding coverage</div>
+          <div class="desc">Every corpus row has a vector. No nulls, no fallbacks, no excuses.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       CITATION CONTRACT
+       ========================================================= -->
+  <section class="section rule-section">
+    <div class="container">
+      <div class="section-head">
+        <div>
+          <span class="index">§05 · the contract</span>
+          <h2>Five fields,<br/>or it doesn't<br/>render.</h2>
+        </div>
+        <div class="deck">
+          The verifier is the smallest interesting piece of the system. It checks
+          every sentence the model generates against a strict five-field schema —
+          if any field is missing, the sentence is dropped before the user sees it.
+        </div>
+      </div>
+
+      <div class="contract">
+        <div class="contract-text">
+          <h3>The schema.</h3>
+          <p>
+            A citation must resolve to a real document, a real paragraph inside
+            that document, a real retrieval score above threshold, and a real
+            source feed. No string-matching, no &ldquo;trust me&rdquo;.
+          </p>
+          <ul class="contract-fields">
+            <li><span class="k">doc_id</span><span class="desc">— stable identifier inside the source feed</span></li>
+            <li><span class="k">source</span><span class="desc">— the feed it came from (wikipedia / osm / chronicling)</span></li>
+            <li><span class="k">paragraph</span><span class="desc">— offset into the document body</span></li>
+            <li><span class="k">score</span><span class="desc">— cosine similarity, must clear 0.42</span></li>
+            <li><span class="k">retrieved_at</span><span class="desc">— ISO 8601 timestamp of the retrieval call</span></li>
+          </ul>
+        </div>
+
+        <pre class="contract-code"><code><span class="k-punct">{</span>
+  <span class="k-key">"sentence"</span><span class="k-punct">:</span> <span class="k-str">"Riverside Church was completed in 1930."</span><span class="k-punct">,</span>
+  <span class="k-key">"citations"</span><span class="k-punct">: [</span>
+    <span class="k-punct">{</span>
+      <span class="k-key">"doc_id"</span><span class="k-punct">:</span>      <span class="k-str">"wp:Riverside_Church"</span><span class="k-punct">,</span>
+      <span class="k-key">"source"</span><span class="k-punct">:</span>      <span class="k-str">"wikipedia"</span><span class="k-punct">,</span>
+      <span class="k-key">"paragraph"</span><span class="k-punct">:</span>   <span class="k-num">3</span><span class="k-punct">,</span>
+      <span class="k-key">"score"</span><span class="k-punct">:</span>       <span class="k-num">0.871</span><span class="k-punct">,</span>
+      <span class="k-key">"retrieved_at"</span><span class="k-punct">:</span><span class="k-str">"2026-05-10T14:22:07Z"</span>
+    <span class="k-punct">}</span>
+  <span class="k-punct">]</span><span class="k-punct">,</span>
+  <span class="k-key">"verified"</span><span class="k-punct">:</span> <span class="k-num">true</span> <span class="check">✓</span>  <span class="k-com">// passes contract</span>
+<span class="k-punct">}</span></code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       SOURCES
+       ========================================================= -->
+  <section class="section rule-section" id="sources">
+    <div class="container">
+      <div class="section-head">
+        <div>
+          <span class="index">§06 · sources</span>
+          <h2>Public<br/>domain,<br/>cited&nbsp;back.</h2>
+        </div>
+        <div class="deck">
+          Every claim in the narration resolves to one of these feeds.
+          v1 ships with Wikipedia and OpenStreetMap; the others are
+          tracked for v2 — schemas drafted, ingesters stubbed.
+        </div>
+      </div>
+
+      <div class="sources-grid">
+        <div class="source-card">
+          <span class="marker wikipedia"></span>
+          <h4>Wikipedia</h4>
+          <p>Long-form narrative, dates, names. Pulled via Wikidata SPARQL for the bbox.</p>
+          <div class="status"><span class="glyph">✓</span>v1 · 612 docs</div>
+        </div>
+        <div class="source-card">
+          <span class="marker osm"></span>
+          <h4>OpenStreetMap</h4>
+          <p>Geometry, addresses, building footprints. POI tags drive the &ldquo;type of place&rdquo; field.</p>
+          <div class="status"><span class="glyph">✓</span>v1 · 316 features</div>
+        </div>
+        <div class="source-card">
+          <span class="marker chronicling"></span>
+          <h4>Chronicling America</h4>
+          <p>Library of Congress newspaper archive. Periodical mentions, contemporary reporting.</p>
+          <div class="status v2"><span class="glyph">⏳</span>v2 · drafted</div>
+        </div>
+        <div class="source-card">
+          <span class="marker nypl"></span>
+          <h4>NYPL Digital</h4>
+          <p>New York Public Library Digital Collections — historical photographs, maps, plates.</p>
+          <div class="status v2"><span class="glyph">⏳</span>v2 · drafted</div>
+        </div>
+        <div class="source-card">
+          <span class="marker nyc-open"></span>
+          <h4>NYC Open Data</h4>
+          <p>Landmark designations, building age, zoning. Authoritative civic record for the city.</p>
+          <div class="status v2"><span class="glyph">⏳</span>v2 · drafted</div>
+        </div>
+        <div class="source-card">
+          <span class="marker mta"></span>
+          <h4>MTA GTFS</h4>
+          <p>Subway and bus geometry. Optional walk leg via transit when the route gets long.</p>
+          <div class="status v2"><span class="glyph">⏳</span>v2 · tracked</div>
+        </div>
+        <div class="source-card">
+          <span class="marker noaa"></span>
+          <h4>NOAA Weather</h4>
+          <p>Local forecast at tour-start time. Narrator adjusts diction when it's raining.</p>
+          <div class="status v2"><span class="glyph">⏳</span>v2 · tracked</div>
+        </div>
+        <div class="source-card">
+          <span class="marker" style="background:transparent;border-color:var(--cobalt-3);border-style:dashed;box-shadow:none;"></span>
+          <h4 style="color:var(--ink-3);">More to come</h4>
+          <p>Curated additions only — Palimpsest does not crawl. Every feed is licensed, public-domain, and explicit.</p>
+          <div class="status" style="color:var(--ink-4);"><span class="glyph" style="color:var(--ink-4);">+</span>open to proposals</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       TECH STACK
+       ========================================================= -->
+  <section class="section tight rule-section">
+    <div class="container">
+      <div class="section-head" style="margin-bottom: var(--sp-8);">
+        <div>
+          <span class="index">§07 · the&nbsp;stack</span>
+          <h2>What's<br/>under the<br/>hood.</h2>
+        </div>
+        <div class="deck">
+          No frameworks-on-frameworks. Each layer is one well-understood tool, picked because
+          it does its job and gets out of the way.
+        </div>
+      </div>
+
+      <div>
+        <div class="tech-line">
+          <span class="label">Frontend</span>
+          <div class="items">
+            <span><em class="glyph">·</em>React 18</span>
+            <span><em class="glyph">·</em>Vite</span>
+            <span><em class="glyph">·</em>TypeScript</span>
+            <span><em class="glyph">·</em>MapLibre&nbsp;GL</span>
+            <span><em class="glyph">·</em>TailwindCSS</span>
+            <span><em class="glyph">·</em>EventSource</span>
+          </div>
+        </div>
+        <div class="tech-line">
+          <span class="label">Agent &amp; API</span>
+          <div class="items">
+            <span><em class="glyph">·</em>FastAPI</span>
+            <span><em class="glyph">·</em>Pydantic v2</span>
+            <span><em class="glyph">·</em>Anthropic&nbsp;Claude</span>
+            <span><em class="glyph">·</em>Server-Sent&nbsp;Events</span>
+            <span><em class="glyph">·</em>uvicorn</span>
+            <span><em class="glyph">·</em>structlog</span>
+          </div>
+        </div>
+        <div class="tech-line">
+          <span class="label">Retrieval</span>
+          <div class="items">
+            <span><em class="glyph">·</em>Postgres&nbsp;16</span>
+            <span><em class="glyph">·</em>pgvector</span>
+            <span><em class="glyph">·</em>PostGIS</span>
+            <span><em class="glyph">·</em>HNSW&nbsp;index</span>
+            <span><em class="glyph">·</em>bge-small-en-v1.5</span>
+            <span><em class="glyph">·</em>cosine&nbsp;@&nbsp;0.42</span>
+          </div>
+        </div>
+        <div class="tech-line">
+          <span class="label">Infra</span>
+          <div class="items">
+            <span><em class="glyph">·</em>Vercel&nbsp;(web)</span>
+            <span><em class="glyph">·</em>Fly.io&nbsp;(agent)</span>
+            <span><em class="glyph">·</em>Neon&nbsp;(pg)</span>
+            <span><em class="glyph">·</em>GitHub&nbsp;Actions</span>
+            <span><em class="glyph">·</em>Sentry</span>
+            <span><em class="glyph">·</em>pytest&nbsp;·&nbsp;ruff</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       TEAM
+       ========================================================= -->
+  <section class="section rule-section" id="team">
+    <div class="container">
+      <div class="section-head">
+        <div>
+          <span class="index">§08 · the&nbsp;team</span>
+          <h2>Built<br/>by three.</h2>
+        </div>
+        <div class="deck">
+          Graduate students in the Department of Computer Science at Columbia,
+          shipped over a semester. Course: EECS&nbsp;E6895, Advanced&nbsp;Big&nbsp;Data&nbsp;&amp;&nbsp;AI.
+        </div>
+      </div>
+
+      <div class="team">
+        <article class="team-card">
+          <div class="initials">CY</div>
+          <h4>Chenhao Yang</h4>
+          <div class="role">retrieval &amp; corpus</div>
+          <p style="font-size:13px;color:var(--ink-3);margin:0;">
+            Built the ingest pipeline, the embedding store, and the
+            spatial index. Wrote the verifier.
+          </p>
+          <span class="affiliation">Columbia · M.S. CS</span>
+          <div class="email"><a href="mailto:cy2822@columbia.edu">cy2822@columbia.edu</a></div>
+        </article>
+
+        <article class="team-card">
+          <div class="initials">KJ</div>
+          <h4>Kaining Jia</h4>
+          <div class="role">agent &amp; API</div>
+          <p style="font-size:13px;color:var(--ink-3);margin:0;">
+            Designed the tool-use loop, the SSE stream, and the typed
+            Pydantic contract for every tool call.
+          </p>
+          <span class="affiliation">Columbia · M.S. CS</span>
+          <div class="email"><a href="mailto:kj2712@columbia.edu">kj2712@columbia.edu</a></div>
+        </article>
+
+        <article class="team-card">
+          <div class="initials">TD</div>
+          <h4>Thomas Duan</h4>
+          <div class="role">frontend &amp; cartography</div>
+          <p style="font-size:13px;color:var(--ink-3);margin:0;">
+            Made the map breathe — engine wrapper, marker style, flyTo
+            choreography, and the chat shell.
+          </p>
+          <span class="affiliation">Columbia · M.S. CS</span>
+          <div class="email"><a href="mailto:hd2593@columbia.edu">hd2593@columbia.edu</a></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       CTA
+       ========================================================= -->
+  <section class="section tight">
+    <div class="container">
+      <div class="cta">
+        <div class="cta-inner">
+          <h2>Walk the page<br/><em>with us.</em></h2>
+          <p>
+            The codebase is public and the documents are public. Clone it, run it
+            against your own bbox, or open an issue with a feed you'd like us to index.
+          </p>
+          <div class="cta-buttons">
+            <a class="btn btn-primary" href="https://github.com/nyavana/Palimpsest-NYC" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.71.08-.71 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.18 1.18a11.04 11.04 0 0 1 5.79 0c2.21-1.49 3.18-1.18 3.18-1.18.62 1.58.23 2.75.11 3.04.73.81 1.18 1.84 1.18 3.1 0 4.42-2.69 5.4-5.25 5.69.41.36.78 1.06.78 2.14v3.17c0 .31.21.68.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>
+              github.com/nyavana/Palimpsest-NYC
+            </a>
+            <a class="btn btn-ghost" href="mailto:Palimpsest-NYC@nyavana.io">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              email&nbsp;the&nbsp;team
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       FOOTER
+       ========================================================= -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="lockup">
+          <img src="assets/logo-primary.svg" alt="Palimpsest NYC" />
+          <p>An illuminated atlas of the city, narrated by an agent. A graduate final project for Columbia EECS E6895, Advanced Big Data and AI.</p>
+        </div>
+        <div class="col">
+          <h5>Project</h5>
+          <a href="#problem">Problem</a>
+          <a href="#demo">Demo</a>
+          <a href="#architecture">Architecture</a>
+          <a href="#sources">Sources</a>
+        </div>
+        <div class="col">
+          <h5>Code</h5>
+          <a href="https://github.com/nyavana/Palimpsest-NYC" target="_blank" rel="noopener">GitHub repo</a>
+          <a href="https://github.com/nyavana/Palimpsest-NYC/blob/main/README.md" target="_blank" rel="noopener">README</a>
+          <a href="https://github.com/nyavana/Palimpsest-NYC/issues" target="_blank" rel="noopener">Issues</a>
+          <a href="https://github.com/nyavana/Palimpsest-NYC/blob/main/LICENSE" target="_blank" rel="noopener">License</a>
+        </div>
+        <div class="col">
+          <h5>Contact</h5>
+          <a href="mailto:Palimpsest-NYC@nyavana.io">Palimpsest-NYC@nyavana.io</a>
+          <a href="https://www.columbia.edu" target="_blank" rel="noopener">Columbia University</a>
+          <a href="#team">Team</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 Palimpsest NYC · MIT License · type set in Cormorant Garamond, Inter &amp; JetBrains Mono</span>
+        <span class="coords">40.806° N · 73.961° W · z14</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/site.js"></script>
+
+</body>
+</html>
