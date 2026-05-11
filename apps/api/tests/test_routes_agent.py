@@ -115,14 +115,16 @@ class _FakeAgentLoop:
 
     last_context: ToolExecutionContext | None = None
     last_router: Any = None
+    last_history_messages: list[Any] | None = None
 
     def __init__(self, events: list[AgentEvent]) -> None:
         self._events = events
 
-    async def run_streamed(self, query: str, *, context: Any):
+    async def run_streamed(self, query: str, *, context: Any, history_messages: Any = None):
         # Capture the per-request context so tests can assert what the
         # SSE handler wired in (routing_backend in particular).
         type(self).last_context = context
+        type(self).last_history_messages = history_messages
         for ev in self._events:
             yield ev
 
@@ -176,12 +178,21 @@ def _build_app(
     # Reset the captured context / router so cross-test leakage doesn't fool us.
     _FakeAgentLoop.last_context = None
     _FakeAgentLoop.last_router = None
+    _FakeAgentLoop.last_history_messages = None
     return app
 
 
-def _post(client: TestClient, q: str, headers: dict[str, str] | None = None):
+def _post(
+    client: TestClient,
+    q: str,
+    headers: dict[str, str] | None = None,
+    history: list[dict[str, str]] | None = None,
+):
     """Stream POST /agent/ask with the given question and optional headers."""
-    return client.stream("POST", "/agent/ask", json={"q": q}, headers=headers)
+    body: dict[str, Any] = {"q": q}
+    if history is not None:
+        body["history"] = history
+    return client.stream("POST", "/agent/ask", json=body, headers=headers)
 
 
 # ── SSE response shape ──────────────────────────────────────────────
@@ -214,6 +225,26 @@ def test_sse_frame_format_event_and_data():
     for f in frames:
         assert f.startswith("event: ")
         assert "\ndata: " in f
+
+
+def test_history_messages_are_forwarded_into_agent_loop():
+    events = [AgentEvent("done", {"result": _result()})]
+    app = _build_app(events)
+    history = [
+        {"role": "user", "content": "Tell me about Riverside Church"},
+        {"role": "assistant", "content": "Riverside Church is a landmark."},
+    ]
+    with TestClient(app) as client, _post(client, "Make it shorter", history=history) as resp:
+        assert resp.status_code == 200
+        b"".join(resp.iter_bytes())
+
+    forwarded = _FakeAgentLoop.last_history_messages
+    assert forwarded is not None
+    assert [msg.role for msg in forwarded] == ["user", "assistant"]
+    assert [msg.content for msg in forwarded] == [
+        "Tell me about Riverside Church",
+        "Riverside Church is a landmark.",
+    ]
 
 
 # ── Wave 4: conditional walk frame ──────────────────────────────────

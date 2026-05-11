@@ -22,13 +22,16 @@ import { openAgentStream } from "./sse";
 import type {
   AgentResultPayload,
   Citation,
+  ConversationHistoryMessage,
   PlannedRoute,
   SsePayloads,
+  SessionTurn,
 } from "./types";
 
 export type SessionStatus = "idle" | "asking" | "streaming" | "done" | "error";
 
 export type SessionState = {
+  history: SessionTurn[];
   status: SessionStatus;
   question: string | null;
   turn: number;
@@ -45,6 +48,7 @@ export type SessionState = {
 };
 
 const initialState: SessionState = {
+  history: [],
   status: "idle",
   question: null,
   turn: 0,
@@ -69,11 +73,46 @@ type Action =
   | { type: "cancel" }
   | { type: "reset" };
 
+function shouldArchiveCurrentTurn(state: SessionState): boolean {
+  return state.question !== null && state.narration.trim().length > 0;
+}
+
+function archiveCurrentTurn(state: SessionState): SessionTurn[] {
+  if (!shouldArchiveCurrentTurn(state) || state.question === null) {
+    return state.history;
+  }
+  const status: SessionTurn["status"] = state.status === "error" ? "error" : "done";
+  return [
+    ...state.history,
+    {
+      question: state.question,
+      narration: state.narration,
+      citations: state.citations,
+      walk: state.walk,
+      warnings: state.warnings,
+      result: state.result,
+      status,
+    },
+  ];
+}
+
+function buildConversationHistory(state: SessionState): ConversationHistoryMessage[] {
+  const turns = shouldArchiveCurrentTurn(state)
+    ? archiveCurrentTurn(state)
+    : state.history;
+
+  return turns.flatMap((turn) => [
+    { role: "user" as const, content: turn.question },
+    { role: "assistant" as const, content: turn.narration },
+  ]);
+}
+
 function reducer(state: SessionState, action: Action): SessionState {
   switch (action.type) {
     case "ask":
       return {
         ...initialState,
+        history: archiveCurrentTurn(state),
         status: "asking",
         question: action.question,
       };
@@ -201,6 +240,7 @@ export function useAgentSession(baseUrl?: string): UseAgentSession {
     (question: string, credentials?: LlmCredentials | null) => {
       const trimmed = question.trim();
       if (trimmed.length === 0) return;
+      const history = buildConversationHistory(state);
       cancel();
       doneRef.current = false;
       dispatch({ type: "ask", question: trimmed });
@@ -224,6 +264,7 @@ export function useAgentSession(baseUrl?: string): UseAgentSession {
         {
           baseUrl,
           credentials: credentials ?? undefined,
+          history,
           onError: (err) => {
             // If we already saw `done`, that's a normal close — drop it.
             if (doneRef.current) return;
@@ -234,7 +275,7 @@ export function useAgentSession(baseUrl?: string): UseAgentSession {
         },
       );
     },
-    [baseUrl, cancel],
+    [baseUrl, cancel, state],
   );
 
   const reset = useCallback(() => {

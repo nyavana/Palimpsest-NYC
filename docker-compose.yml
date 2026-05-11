@@ -174,8 +174,10 @@ services:
       - /data/extract.osrm
     volumes:
       - osrm-data:/data:ro
-    ports:
-      - "5000:5000"
+    # The api container reaches OSRM over the compose network at
+    # http://osrm:5000, so we do not need to publish this port on the
+    # host. Leaving it unbound avoids collisions with local macOS services
+    # that often claim :5000.
     depends_on:
       osrm-prepare:
         condition: service_completed_successfully

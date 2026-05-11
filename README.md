@@ -20,6 +20,9 @@ The four properties below are enforced in code, not aspirational:
 - Single-tool agentic loop with a hard turn cap and a JSON terminal contract.
 - Every claim cited under a strict five-field contract, verified at generation time.
 - Server-streamed via SSE; the map renders the route with `flyTo` as citations arrive.
+- Structured food discovery flow: ask for coffee, lunch, or dessert nearby, compare candidates on the map, then choose one and continue the walk.
+
+For the new "find food, choose a place, then route there" flow, see [docs/food-discovery/README.md](docs/food-discovery/README.md).
 
 ## Quickstart
 
@@ -226,6 +229,8 @@ The agent runs as a streamed multi-turn loop:
 The loop is intentionally narrow: two tools, one terminal response shape, and no branching once citations are verified. That keeps each invariant easy to test in isolation and easy to reason about when something fails.
 
 For the architecture diagram and the agent loop deep-dive, see [`docs/project-overview.md`](docs/project-overview.md), [`docs/agent-2026-04-28.md`](docs/agent-2026-04-28.md), and [`docs/route-planning-2026-05-04.md`](docs/route-planning-2026-05-04.md).
+
+For the structured food-pick workflow and its implementation notes, see [`docs/food-discovery/README.md`](docs/food-discovery/README.md).
 
 ## Tech stack
 
