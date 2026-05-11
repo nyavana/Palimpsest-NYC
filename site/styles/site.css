@@ -751,6 +751,7 @@ body { margin: 0; overflow-x: hidden; }
 .demo {
   display: grid;
   grid-template-columns: 0.85fr 1.15fr;
+  grid-template-rows: minmax(0, 1fr);
   gap: 0;
   background: var(--paper);
   border: 1px solid var(--rule);
@@ -760,14 +761,15 @@ body { margin: 0; overflow-x: hidden; }
   height: 580px;
 }
 @media (max-width: 860px) {
-  .demo { grid-template-columns: 1fr; height: auto; }
+  .demo { grid-template-columns: 1fr; grid-template-rows: 480px 480px; height: auto; }
 }
 .demo-chat {
   display: flex; flex-direction: column;
   background: var(--ice);
   border-right: 1px solid var(--rule);
+  min-height: 0;
 }
-@media (max-width: 860px) { .demo-chat { border-right: none; border-bottom: 1px solid var(--rule); height: 480px; } }
+@media (max-width: 860px) { .demo-chat { border-right: none; border-bottom: 1px solid var(--rule); } }
 .demo-chat-header {
   padding: 16px 20px;
   border-bottom: 1px solid var(--rule);
