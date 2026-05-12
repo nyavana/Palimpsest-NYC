@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 _CCR = """You are evaluating Citation Correctness Rate (CCR).
-Definition: fraction of citations whose doc_id appears in retrieved_docs AND whose `span` is plausibly supported by that document's `body_excerpt`. If there are no citations, score 0.
-If retrieved_docs is empty for the row, FIRST check whether the system is a no-retrieval baseline (e.g. vanilla_llm) — in that case treat the citations themselves as the system's bibliography and judge each `span` against general knowledge of Manhattan. For retrieval-using systems with empty retrieved_docs, score 0 (the system cited without retrieving).
+Definition: fraction of citations whose doc_id was actually retrieved by the system AND whose `span` is consistent with what that document represents. If there are no citations, score 0.
+
+Per-citation decision tree:
+1. If the citation's doc_id appears in retrieved_docs AND body_excerpt is non-empty: the citation is supported if `span` is plausibly described by `body_excerpt` (textual verification).
+2. If the citation's doc_id appears in retrieved_docs AND body_excerpt is empty: this is the normal case for OSM citations — the OSM corpus stores name + source_url + lat/lon, no prose body. Treat the citation as supported if `source_type`, `source_url`, and (when present) `name` are consistent with the `span`. Empty body_excerpt is NOT grounds to mark unsupported by itself; the retrieval grounding alone counts.
+3. If the citation's doc_id does NOT appear in retrieved_docs and the system is a retrieval-using system, the citation is unsupported (system cited something it did not retrieve).
+4. If retrieved_docs is empty AND the system is a no-retrieval baseline (e.g. vanilla_llm), treat the citations themselves as the system's bibliography and judge each `span` against general knowledge of Manhattan.
+
 Return EXACTLY one JSON object: {"score": <float in [0,1]>, "reasoning": "<one sentence>"}.
-You will receive: question, narration, citations, retrieved_docs (each with body_excerpt). Use `body_excerpt` as the authoritative source for span support."""
+You will receive: question, narration, citations, retrieved_docs (each may have name/source_url/source_type/body_excerpt, some optional)."""
 
 _HR = """You are evaluating Hallucination Rate (HR). Lower is better.
 Extract up to 8 factual claims from the narration (first 8 in order). For each claim, decide if it is supported by any retrieved document's `body_excerpt` (preferred) or, when retrieved_docs is empty AND the system is a no-retrieval baseline, by general knowledge of Manhattan.
