@@ -74,6 +74,26 @@ Full design: [`openspec/changes/initial-palimpsest-scaffold/design.md`](../opens
 
 Full task ledger: [`openspec/changes/initial-palimpsest-scaffold/tasks.md`](../openspec/changes/initial-palimpsest-scaffold/tasks.md).
 
+## Status as of milestone 2 — V1.5 (2026-05-12)
+
+**Shipped on `worktree-eval-depth-and-corpus-expansion`, tag `manhattan-100-eval-complete`.** Three orthogonal capability blocks; the locked V1 contract (7-turn cap, JSON terminal, five-field citations, one corrective retry, SSE event names) was not relaxed.
+
+| Phase | What | Status |
+|---|---|---|
+| 0 | Eval harness scaffold (3 baselines: vanilla / naive_rag / palimpsest; LLM-judge; aggregate; `/internal/retrieve` + `/internal/documents/by_ids`) | ✓ shipped |
+| 1 | Manhattan-wide corpus expansion (`SCOPE_BBOX` widened; automatic re-ingest on `make nuke && make up`) | ✓ shipped |
+| 2 | Pre-registered 95-question Manhattan bank with categories.yaml (tagged `eval/manhattan-100-v1`) | ✓ shipped |
+| 3 | Run + judge + aggregate 3 baseline systems on 95Q | ✓ shipped |
+| 4 | Hybrid retrieval (`DenseRetriever`, `SparseRetriever`, RRF fusion, `HybridRetriever`, factory + `RETRIEVAL_MODE` flag, shape-contract test, hybrid eval row) | ✓ shipped |
+| 5 | `BAAI/bge-reranker-base` cross-encoder reranker (`RerankedRetriever`, lifespan wiring conditional on `RETRIEVAL_MODE=hybrid_reranked` or `RERANKER_ENABLED`, reranked eval row) | ✓ shipped |
+| 6 | Per-region + per-source breakdowns (CSVs + bar-chart PNGs), accuracy-vs-latency Pareto, GRR table on out-of-scope subset, methodology summary | ✓ shipped |
+| — | OSRM extract resize for Manhattan bbox | deferred per design risk R8 |
+| — | Cohen's κ hand-grading on 20-question calibration set | deferred per session preference; `kappa` cell in ablation table is `null` |
+
+**Numbers as of milestone 2**: 12,858 OSM + 492 Wikipedia places + 456 Wikipedia documents in postgres (Manhattan island bbox). Final 5-row ablation in `docs/eval/results/ablation_table.md`: palimpsest-hybrid-reranked CCR=0.755 [0.678, 0.818], vs vanilla 0.068, naive_rag 0.856. Methodology, caveats (v2 CCR rubric, citation-frame doc_id harvesting, LLMCache warm-up, hybrid serialization, judge self-grading risk) and reproducibility recipe in [`docs/eval/manhattan-100-results.md`](eval/manhattan-100-results.md).
+
+Full task ledger: [`openspec/changes/eval-depth-and-corpus-expansion/tasks.md`](../openspec/changes/eval-depth-and-corpus-expansion/tasks.md).
+
 ---
 
 ## Design decisions locked for V1
@@ -161,6 +181,7 @@ The phase notes in [`docs/`](.) are dated snapshots written at the end of each m
 - [`db-and-embeddings-2026-04-28.md`](db-and-embeddings-2026-04-28.md): §10 schema, ORM, and the `BAAI/bge-small-en-v1.5` embedder singleton.
 - [`ingestion-2026-04-28.md`](ingestion-2026-04-28.md): §11 Wikipedia/Wikidata and OSM Overpass ingestion, including the raw-cache replay layer.
 - [`agent-2026-04-28.md`](agent-2026-04-28.md): §9 / §12.1-4 agent loop, citation verifier, server-side `plan_walk`, and the `/agent/ask` SSE endpoint.
+- [`eval/manhattan-100-results.md`](eval/manhattan-100-results.md): V1.5 5-system ablation, per-region + per-source breakdowns, Pareto figure, GRR table, and the methodology caveats (v2 CCR rubric, LLMCache warm-up, judge self-grading risk).
 
 ---
 
