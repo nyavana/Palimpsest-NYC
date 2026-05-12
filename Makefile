@@ -158,3 +158,21 @@ extract: ## Print the BBBike URL and curl command to download the OSM extract
 	@echo "3. Then run:  make up"
 	@echo "   osrm-prepare will preprocess the extract (~2 min on first run)."
 	@echo ""
+
+# ─────────────────────────────── eval ───────────────────────────────
+
+.PHONY: eval-setup eval-deps eval-shell
+
+eval-setup: docs/eval/.venv/.installed
+
+docs/eval/.venv/.installed: docs/eval/requirements.txt
+	python3 -m venv docs/eval/.venv
+	docs/eval/.venv/bin/pip install --upgrade pip
+	docs/eval/.venv/bin/pip install -r docs/eval/requirements.txt
+	touch $@
+
+eval-deps:
+	docs/eval/.venv/bin/pip install -r docs/eval/requirements.txt
+
+eval-shell:
+	@echo "Run: source docs/eval/.venv/bin/activate"

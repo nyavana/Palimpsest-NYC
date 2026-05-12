@@ -72,6 +72,11 @@ services:
     env_file: .env
     environment:
       HF_HOME: /cache/huggingface
+      # Shell-passed flags for eval phases. Defaults match the V1 status quo so
+      # `make up` with no shell vars set is unchanged. Cosmetic on this service
+      # (ingestion does not branch on retrieval mode); kept for symmetry with api.
+      RETRIEVAL_MODE: ${RETRIEVAL_MODE:-dense}
+      RERANKER_ENABLED: ${RERANKER_ENABLED:-false}
     depends_on:
       postgres:
         condition: service_healthy
@@ -95,6 +100,10 @@ services:
     env_file: .env
     environment:
       HF_HOME: /cache/huggingface
+      # Shell-passed flags for eval phases. Defaults match the V1 status quo so
+      # `make up` with no shell vars set is unchanged.
+      RETRIEVAL_MODE: ${RETRIEVAL_MODE:-dense}
+      RERANKER_ENABLED: ${RERANKER_ENABLED:-false}
     depends_on:
       postgres:
         condition: service_healthy

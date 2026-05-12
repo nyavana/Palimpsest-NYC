@@ -25,7 +25,7 @@ from app.llm.cache import CacheTtl, LLMCache
 from app.llm.router import build_llm_router
 from app.llm.telemetry import TelemetrySink
 from app.logging import configure_logging, get_logger
-from app.routes import agent, config, health, llm, meta, places
+from app.routes import agent, config, health, internal_retrieve, llm, meta, places
 from app.routing import OsrmBackend
 
 log = get_logger(__name__)
@@ -180,6 +180,7 @@ def create_app() -> FastAPI:
     app.include_router(meta.router, prefix="/internal", tags=["meta"])
     app.include_router(places.router)
     app.include_router(agent.router)
+    app.include_router(internal_retrieve.router)
 
     # ── Exception handlers ────────────────────────────────────
     @app.exception_handler(Exception)

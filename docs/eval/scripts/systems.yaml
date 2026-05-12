@@ -1,0 +1,32 @@
+# Per-system config consumed by run_eval_v2.py. Pinning model + retrieval
+# mode here means re-running with the same yaml reproduces the same numbers
+# (up to LLM stochasticity, which we mitigate with temperature 0).
+systems:
+  - name: vanilla
+    kind: vanilla_llm
+    model: moonshotai/kimi-k2.6-20260420
+    base_url: https://openrouter.ai/api/v1
+    temperature: 0.0
+
+  - name: naive_rag
+    kind: naive_rag
+    model: moonshotai/kimi-k2.6-20260420
+    base_url: https://openrouter.ai/api/v1
+    temperature: 0.0
+    retrieve_top_k: 8
+    retrieve_url: http://localhost:8000/internal/retrieve
+
+  - name: palimpsest-dense
+    kind: palimpsest
+    api_base_url: http://localhost:8000
+    retrieval_mode: dense
+
+  - name: palimpsest-hybrid
+    kind: palimpsest
+    api_base_url: http://localhost:8000
+    retrieval_mode: hybrid
+
+  - name: palimpsest-hybrid-reranked
+    kind: palimpsest
+    api_base_url: http://localhost:8000
+    retrieval_mode: hybrid_reranked
