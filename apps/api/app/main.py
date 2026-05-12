@@ -105,6 +105,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.embedder = build_embedder(settings.embeddings)
     log.info("embedder.ready", dim=app.state.embedder.dim)
 
+    # Reranker singleton — loaded only when needed. CPU-only.
+    if settings.reranker_enabled or settings.retrieval_mode == "hybrid_reranked":
+        log.info("reranker.loading", model=settings.reranker_model)
+        from app.embeddings.reranker import build_reranker
+
+        app.state.reranker = build_reranker(settings.reranker_model)
+        log.info("reranker.ready")
+    else:
+        app.state.reranker = None
+
     # Routing backend (V1 = OSRM in-cluster). The backend opens a fresh
     # httpx.AsyncClient per `route()` call so there is no connection pool
     # to dispose on shutdown.
