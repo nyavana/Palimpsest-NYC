@@ -72,6 +72,120 @@ async def test_openrouter_chat_handles_missing_usage_fields():
     assert resp["cost_usd"] == 0.0
 
 
+async def test_openrouter_chat_prefers_usage_cost_over_total_cost():
+    """Per OpenRouter docs the canonical field is ``cost``; we prefer it when present."""
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": "ok"}}],
+                "usage": {
+                    "prompt_tokens": 10,
+                    "completion_tokens": 5,
+                    "cost": 0.0025,
+                    "total_cost": 0.0099,
+                },
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport, base_url="https://x") as inner:
+        client = OpenRouterChatClient(http_client=inner, api_key="k")
+        resp = await client.chat(model="m", messages=[], temperature=0.0)
+
+    assert resp["cost_usd"] == pytest.approx(0.0025)
+
+
+async def test_openrouter_chat_falls_back_to_total_cost_when_cost_missing():
+    """Legacy / OpenAI-passthrough rows only carry ``total_cost``."""
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": "ok"}}],
+                "usage": {
+                    "prompt_tokens": 10,
+                    "completion_tokens": 5,
+                    "total_cost": 0.0011,
+                },
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport, base_url="https://x") as inner:
+        client = OpenRouterChatClient(http_client=inner, api_key="k")
+        resp = await client.chat(model="m", messages=[], temperature=0.0)
+
+    assert resp["cost_usd"] == pytest.approx(0.0011)
+
+
+async def test_openrouter_chat_returns_zero_cost_when_neither_field_present():
+    """Free-tier rows have ``usage`` but no cost field — must not crash."""
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": "ok"}}],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport, base_url="https://x") as inner:
+        client = OpenRouterChatClient(http_client=inner, api_key="k")
+        resp = await client.chat(model="m", messages=[], temperature=0.0)
+
+    assert resp["cost_usd"] == 0.0
+
+
+async def test_openrouter_chat_forwards_response_format():
+    """``response_format`` must round-trip into the request payload when supplied."""
+
+    captured: dict = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "{}"}}]},
+        )
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport, base_url="https://x") as inner:
+        client = OpenRouterChatClient(http_client=inner, api_key="k")
+        await client.chat(
+            model="m",
+            messages=[],
+            temperature=0.0,
+            response_format={"type": "json_object"},
+        )
+
+    assert captured["response_format"] == {"type": "json_object"}
+
+
+async def test_openrouter_chat_omits_response_format_when_not_set():
+    """When the caller does not pass response_format, it must not appear in the payload."""
+
+    captured: dict = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "x"}}]},
+        )
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport, base_url="https://x") as inner:
+        client = OpenRouterChatClient(http_client=inner, api_key="k")
+        await client.chat(model="m", messages=[], temperature=0.0)
+
+    assert "response_format" not in captured
+
+
 async def test_openrouter_chat_raises_on_http_error():
     async def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(401, json={"error": "bad key"})

@@ -35,8 +35,22 @@ class _FakeChatClient:
         self.calls: list[dict[str, Any]] = []
         self._response = response
 
-    async def chat(self, *, model: str, messages: list[dict], temperature: float) -> dict[str, Any]:
-        self.calls.append({"model": model, "messages": messages, "temperature": temperature})
+    async def chat(
+        self,
+        *,
+        model: str,
+        messages: list[dict],
+        temperature: float,
+        response_format: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        self.calls.append(
+            {
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+                "response_format": response_format,
+            }
+        )
         return self._response
 
 
@@ -88,6 +102,58 @@ async def test_vanilla_malformed_json_records_error():
     assert row["citations"] == []
     assert row["error"] is not None
     assert "json" in row["error"].lower()
+
+
+async def test_vanilla_requests_json_object_response_format():
+    """Baselines must pass response_format=json_object so OpenRouter constrains output."""
+    fake = _FakeChatClient(
+        response={
+            "content": '{"narration": "n", "citations": []}',
+            "prompt_tokens": 1,
+            "completion_tokens": 1,
+            "cost_usd": 0.0,
+        }
+    )
+    await run_vanilla(question="Q", model="m", chat_client=fake, temperature=0.0)
+    assert fake.calls[0]["response_format"] == {"type": "json_object"}
+
+
+async def test_vanilla_strips_fenced_json_block():
+    """Phase-0 smoke run observed kimi wrapping its JSON in ```json ... ``` fences."""
+    fenced = (
+        "```json\n"
+        '{"narration": "Fenced reply.", '
+        '"citations": [{"doc_id": "wikipedia:Foo", '
+        '"source_url": "https://en.wikipedia.org/wiki/Foo", '
+        '"source_type": "wikipedia", "span": "x"}]}\n'
+        "```"
+    )
+    fake = _FakeChatClient(
+        response={
+            "content": fenced,
+            "prompt_tokens": 10,
+            "completion_tokens": 10,
+            "cost_usd": 0.0,
+        }
+    )
+    row = await run_vanilla(question="Q", model="m", chat_client=fake, temperature=0.0)
+    assert row["error"] is None
+    assert row["narration"] == "Fenced reply."
+    assert row["citations"][0]["doc_id"] == "wikipedia:Foo"
+
+
+async def test_vanilla_strips_preamble_before_json():
+    """A short preamble before the JSON object should not break parsing."""
+    preamble = (
+        "Here's the JSON you requested:\n"
+        '{"narration": "Preamble reply.", "citations": []}'
+    )
+    fake = _FakeChatClient(
+        response={"content": preamble, "prompt_tokens": 1, "completion_tokens": 1, "cost_usd": 0.0}
+    )
+    row = await run_vanilla(question="Q", model="m", chat_client=fake, temperature=0.0)
+    assert row["error"] is None
+    assert row["narration"] == "Preamble reply."
 
 
 # --- naive_rag tests ---
@@ -150,6 +216,49 @@ async def test_naive_rag_row_shape_with_retrieval():
     # Retrieval injection should appear in the user prompt
     user_messages = [m for m in chat.calls[0]["messages"] if m["role"] == "user"]
     assert "wikipedia:Cathedral" in user_messages[-1]["content"]
+    # Phase-0 fix: baseline must pin response_format and the prompt forbids fences.
+    assert chat.calls[0]["response_format"] == {"type": "json_object"}
+
+
+async def test_naive_rag_strips_fenced_json_block():
+    """Same fence-stripping fix as vanilla — observed in Phase 0 smoke."""
+    from docs.eval.scripts.baselines.naive_rag import run_naive_rag
+
+    retriever = _FakeRetrieveClient(
+        results=[
+            {
+                "doc_id": "wikipedia:Cathedral",
+                "name": "Cathedral",
+                "source_type": "wikipedia",
+                "source_url": "https://en.wikipedia.org/wiki/Cathedral",
+                "lat": 40.8,
+                "lon": -73.96,
+                "score": 0.71,
+            }
+        ]
+    )
+    fenced = (
+        "```json\n"
+        '{"narration": "Fenced n.", '
+        '"citations": [{"doc_id": "wikipedia:Cathedral", '
+        '"source_url": "https://en.wikipedia.org/wiki/Cathedral", '
+        '"source_type": "wikipedia", "span": "x"}]}\n'
+        "```"
+    )
+    chat = _FakeChatClient(
+        response={"content": fenced, "prompt_tokens": 1, "completion_tokens": 1, "cost_usd": 0.0}
+    )
+    row = await run_naive_rag(
+        question="Q",
+        model="m",
+        chat_client=chat,
+        retrieve_client=retriever,
+        top_k=4,
+        temperature=0.0,
+    )
+    assert row["error"] is None
+    assert row["narration"] == "Fenced n."
+    assert row["citations"][0]["doc_id"] == "wikipedia:Cathedral"
 
 
 # --- palimpsest baseline tests ---

@@ -13,10 +13,14 @@ import json
 import time
 from typing import Any, Protocol
 
+from docs.eval.scripts.baselines._json_utils import strip_json_fences
+
 _SYSTEM_PROMPT = """You are a Manhattan walking-tour narrator. Answer the user's question with a short narration
 (2-4 sentences) about real places in Manhattan, and provide citations supporting your claims.
 
-Return EXACTLY one JSON object with this shape, and nothing else:
+Return ONLY one JSON object — no prose before or after, no markdown code fences,
+no commentary. The first character of your reply MUST be '{' and the last MUST
+be '}'. Use exactly this shape:
 
 {
   "narration": "<your narration text>",
@@ -33,7 +37,14 @@ Return EXACTLY one JSON object with this shape, and nothing else:
 
 
 class ChatClient(Protocol):
-    async def chat(self, *, model: str, messages: list[dict], temperature: float) -> dict[str, Any]: ...
+    async def chat(
+        self,
+        *,
+        model: str,
+        messages: list[dict],
+        temperature: float,
+        response_format: dict[str, Any] | None = ...,
+    ) -> dict[str, Any]: ...
 
 
 async def run_vanilla(
@@ -57,8 +68,9 @@ async def run_vanilla(
                 {"role": "user", "content": question},
             ],
             temperature=temperature,
+            response_format={"type": "json_object"},
         )
-        content = response.get("content") or ""
+        content = strip_json_fences(response.get("content") or "")
         parsed = json.loads(content)
         narration = str(parsed.get("narration") or "")
         raw_citations = parsed.get("citations") or []

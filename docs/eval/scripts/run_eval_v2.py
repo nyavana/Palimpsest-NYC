@@ -97,16 +97,55 @@ async def _run_one_system(
     doc_client: Any | None,
     out_path: Path, label: str,
 ) -> None:
-    rows: list[dict[str, Any]] = []
-    for i, q in enumerate(questions, 1):
-        print(f"  [{system['name']} {i}/{len(questions)}] {q[:70]}", flush=True)
-        rows.append(await dispatch_system(
-            system=system, question=q, chat_client=chat_client,
-            retrieve_client=retrieve_client, api_http_client=api_http_client,
-            doc_client=doc_client,
-        ))
-        await asyncio.sleep(0.5)
-    write_run_jsonl(out_path, system_name=system["name"], label=label, rows=rows)
+    # Incremental write: open the file once, emit header + each row as it's
+    # produced, then footer at the end. If the process is killed mid-run, we
+    # keep N-1 rows on disk — and `--resume` can detect the partial state.
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    # Resume support: if file exists and looks well-formed up through some
+    # rows, skip ahead. We detect by counting existing `type=row` lines.
+    skip = 0
+    if out_path.exists():
+        try:
+            existing = [
+                json.loads(l) for l in out_path.read_text().splitlines() if l.strip()
+            ]
+            skip = sum(1 for l in existing if l.get("type") == "row")
+            # If footer present, this system already complete; bail early.
+            if any(l.get("type") == "footer" for l in existing):
+                print(
+                    f"  [{system['name']}] already complete (rows={skip}); skipping",
+                    flush=True,
+                )
+                return
+        except (json.JSONDecodeError, OSError):
+            skip = 0  # malformed file; start over below
+    started_at = time.strftime("%Y-%m-%dT%H-%M-%SZ", time.gmtime())
+    mode = "a" if skip > 0 else "w"
+    with out_path.open(mode, encoding="utf-8") as fh:
+        if skip == 0:
+            fh.write(json.dumps({
+                "type": "header", "system": system["name"], "label": label,
+                "started_at": started_at, "n_rows": len(questions),
+            }) + "\n")
+            fh.flush()
+        elif skip:
+            print(f"  [{system['name']}] resuming after row {skip}", flush=True)
+        for i, q in enumerate(questions, 1):
+            if i <= skip:
+                continue
+            print(f"  [{system['name']} {i}/{len(questions)}] {q[:70]}", flush=True)
+            row = await dispatch_system(
+                system=system, question=q, chat_client=chat_client,
+                retrieve_client=retrieve_client, api_http_client=api_http_client,
+                doc_client=doc_client,
+            )
+            fh.write(json.dumps({**row, "type": "row", "index": i - 1}) + "\n")
+            fh.flush()
+            await asyncio.sleep(0.5)
+        fh.write(json.dumps({
+            "type": "footer", "system": system["name"], "label": label,
+            "ended_at": time.strftime("%Y-%m-%dT%H-%M-%SZ", time.gmtime()),
+        }) + "\n")
 
 
 async def run(systems_yaml: Path, questions_path: Path, label: str, out_dir: Path) -> None:

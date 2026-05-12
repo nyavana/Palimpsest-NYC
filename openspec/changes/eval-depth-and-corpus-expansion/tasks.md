@@ -51,18 +51,18 @@ These apply to every task below — do not restate them per task.
 
 ## 4. Phase 4 — Hybrid retrieval
 
-- [ ] 4.1 Task 4.1 — Extract `DenseRetriever` from `search_places` into `apps/api/app/retrieval/dense.py` (TDD; preserves V1 tool-result shape) (canonical plan L3664–L3876)
-- [ ] 4.2 Task 4.2 — `apps/api/app/retrieval/sparse.py` — `SparseRetriever` over `pg_trgm` on `places.name` (TDD) (canonical plan L3878–L4065)
-- [ ] 4.3 Task 4.3 — `apps/api/app/retrieval/fusion.py` — Reciprocal Rank Fusion with k=60 (pure function, TDD) (canonical plan L4067–L4189)
-- [ ] 4.4 Task 4.4 — `apps/api/app/retrieval/hybrid.py` — `HybridRetriever` running dense + sparse concurrently + RRF merge (TDD) (canonical plan L4191–L4360)
+- [x] 4.1 Task 4.1 — Extract `DenseRetriever` from `search_places` into `apps/api/app/retrieval/dense.py` (TDD; preserves V1 tool-result shape) (canonical plan L3664–L3876)
+- [x] 4.2 Task 4.2 — `apps/api/app/retrieval/sparse.py` — `SparseRetriever` over `pg_trgm` on `places.name` (TDD) (canonical plan L3878–L4065)
+- [x] 4.3 Task 4.3 — `apps/api/app/retrieval/fusion.py` — Reciprocal Rank Fusion with k=60 (pure function, TDD) (canonical plan L4067–L4189)
+- [x] 4.4 Task 4.4 — `apps/api/app/retrieval/hybrid.py` — `HybridRetriever` running dense + sparse concurrently + RRF merge (TDD) (canonical plan L4191–L4360)
 - [ ] 4.5 Task 4.5 — `apps/api/app/retrieval/factory.py` — `build_retriever(mode)` factory + `RETRIEVAL_MODE` flag wiring in `apps/api/app/config.py` and `apps/api/app/main.py` lifespan (TDD) (canonical plan L4362–L4581)
 - [ ] 4.6 Task 4.6 — Shape-contract assertion in `apps/api/tests/test_agent_search_places.py`: tool-result is byte-identical across `dense` / `hybrid` / `hybrid_reranked` (canonical plan L4583–L4639)
 - [ ] 4.7 Task 4.7 — Restart with `RETRIEVAL_MODE=hybrid`, run the 100-question bank for the hybrid system row, hand-grade the 20 calibration questions, append to `ablation_table.md` (canonical plan L4641–L4716)
 
 ## 5. Phase 5 — Cross-encoder reranker
 
-- [ ] 5.1 Task 5.1 — `apps/api/app/embeddings/reranker.py` — `Reranker` singleton wrapping `BAAI/bge-reranker-base` (TDD) (canonical plan L4720–L4844)
-- [ ] 5.2 Task 5.2 — `apps/api/app/retrieval/reranked.py` — `RerankedRetriever` wrapping `HybridRetriever` with cross-encoder top-N rerank (TDD) (canonical plan L4846–L5000)
+- [x] 5.1 Task 5.1 — `apps/api/app/embeddings/reranker.py` — `Reranker` singleton wrapping `BAAI/bge-reranker-base` (TDD) (canonical plan L4720–L4844)
+- [x] 5.2 Task 5.2 — `apps/api/app/retrieval/reranked.py` — `RerankedRetriever` wrapping `HybridRetriever` with cross-encoder top-N rerank (TDD) (canonical plan L4846–L5000)
 - [ ] 5.3 Task 5.3 — Wire the reranker into `apps/api/app/main.py` lifespan conditionally on `settings.retrieval_mode == "hybrid_reranked"` or `settings.reranker_enabled` (canonical plan L5002–L5046)
 - [ ] 5.4 Task 5.4 — Verify reranker loads from `hf-cache` inside the container without a Hugging Face network call (canonical plan L5048–L5099)
 - [ ] 5.5 Task 5.5 — Restart with `RETRIEVAL_MODE=hybrid_reranked`, run the 100-question bank for the reranker row, hand-grade the 20 calibration questions, append the final row to `ablation_table.md` (canonical plan L5101–L5158)
