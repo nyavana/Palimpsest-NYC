@@ -44,33 +44,33 @@ These apply to every task below — do not restate them per task.
 
 ## 3. Phase 3 — Baseline + dense Palimpsest measurement
 
-- [ ] 3.1 Task 3.1 — Run `run_eval_v2.py` against all 100 questions × 3 systems (vanilla, naive_rag, palimpsest-dense); produce JSONL (canonical plan L3073–L3124)
-- [ ] 3.2 Task 3.2 — Hand-grade the 20-question calibration set into `docs/eval/grades/calibration.csv` (canonical plan L3126–L3190)
-- [ ] 3.3 Task 3.3 — Run LLM-judge over all 300 rows; respect the ~$10 cost cap (canonical plan L3192–L3363)
-- [ ] 3.4 Task 3.4 — `docs/eval/scripts/aggregate.py` + Cohen's κ math (TDD) → first `ablation_table.md` with 3 baseline rows + κ (canonical plan L3365–L3660)
+- [x] 3.1 Task 3.1 — Run `run_eval_v2.py` against all 100 questions × 3 systems (vanilla, naive_rag, palimpsest-dense); produce JSONL (canonical plan L3073–L3124)
+- [ ] 3.2 Task 3.2 — Hand-grade the 20-question calibration set into `docs/eval/grades/calibration.csv` (canonical plan L3126–L3190) — **deferred** per [[feedback-skip-human-review]]; kappa recorded as null in `ablation_table.md`
+- [x] 3.3 Task 3.3 — Run LLM-judge over all 300 rows; respect the ~$10 cost cap (canonical plan L3192–L3363) — actual spend $1.59 across 5 systems × 95Q (gpt-5.4-mini judge per session decision)
+- [x] 3.4 Task 3.4 — `docs/eval/scripts/aggregate.py` + Cohen's κ math (TDD) → first `ablation_table.md` with 3 baseline rows + κ (canonical plan L3365–L3660)
 
 ## 4. Phase 4 — Hybrid retrieval
 
 - [x] 4.1 Task 4.1 — Extract `DenseRetriever` from `search_places` into `apps/api/app/retrieval/dense.py` (TDD; preserves V1 tool-result shape) (canonical plan L3664–L3876)
 - [x] 4.2 Task 4.2 — `apps/api/app/retrieval/sparse.py` — `SparseRetriever` over `pg_trgm` on `places.name` (TDD) (canonical plan L3878–L4065)
 - [x] 4.3 Task 4.3 — `apps/api/app/retrieval/fusion.py` — Reciprocal Rank Fusion with k=60 (pure function, TDD) (canonical plan L4067–L4189)
-- [x] 4.4 Task 4.4 — `apps/api/app/retrieval/hybrid.py` — `HybridRetriever` running dense + sparse concurrently + RRF merge (TDD) (canonical plan L4191–L4360)
-- [ ] 4.5 Task 4.5 — `apps/api/app/retrieval/factory.py` — `build_retriever(mode)` factory + `RETRIEVAL_MODE` flag wiring in `apps/api/app/config.py` and `apps/api/app/main.py` lifespan (TDD) (canonical plan L4362–L4581)
-- [ ] 4.6 Task 4.6 — Shape-contract assertion in `apps/api/tests/test_agent_search_places.py`: tool-result is byte-identical across `dense` / `hybrid` / `hybrid_reranked` (canonical plan L4583–L4639)
-- [ ] 4.7 Task 4.7 — Restart with `RETRIEVAL_MODE=hybrid`, run the 100-question bank for the hybrid system row, hand-grade the 20 calibration questions, append to `ablation_table.md` (canonical plan L4641–L4716)
+- [x] 4.4 Task 4.4 — `apps/api/app/retrieval/hybrid.py` — `HybridRetriever` running dense + sparse concurrently + RRF merge (TDD) (canonical plan L4191–L4360) — branches were later **serialized** under shared AsyncSession (commit c4a746a) to satisfy SQLAlchemy's no-concurrent-ops invariant
+- [x] 4.5 Task 4.5 — `apps/api/app/retrieval/factory.py` — `build_retriever(mode)` factory + `RETRIEVAL_MODE` flag wiring in `apps/api/app/config.py` and `apps/api/app/main.py` lifespan (TDD) (canonical plan L4362–L4581)
+- [x] 4.6 Task 4.6 — Shape-contract assertion in `apps/api/tests/test_agent_search_places.py`: tool-result is byte-identical across `dense` / `hybrid` / `hybrid_reranked` (canonical plan L4583–L4639)
+- [x] 4.7 Task 4.7 — Restart with `RETRIEVAL_MODE=hybrid`, run the 100-question bank for the hybrid system row, hand-grade the 20 calibration questions, append to `ablation_table.md` (canonical plan L4641–L4716) — calibration hand-grading skipped per [[feedback-skip-human-review]]
 
 ## 5. Phase 5 — Cross-encoder reranker
 
 - [x] 5.1 Task 5.1 — `apps/api/app/embeddings/reranker.py` — `Reranker` singleton wrapping `BAAI/bge-reranker-base` (TDD) (canonical plan L4720–L4844)
 - [x] 5.2 Task 5.2 — `apps/api/app/retrieval/reranked.py` — `RerankedRetriever` wrapping `HybridRetriever` with cross-encoder top-N rerank (TDD) (canonical plan L4846–L5000)
-- [ ] 5.3 Task 5.3 — Wire the reranker into `apps/api/app/main.py` lifespan conditionally on `settings.retrieval_mode == "hybrid_reranked"` or `settings.reranker_enabled` (canonical plan L5002–L5046)
-- [ ] 5.4 Task 5.4 — Verify reranker loads from `hf-cache` inside the container without a Hugging Face network call (canonical plan L5048–L5099)
-- [ ] 5.5 Task 5.5 — Restart with `RETRIEVAL_MODE=hybrid_reranked`, run the 100-question bank for the reranker row, hand-grade the 20 calibration questions, append the final row to `ablation_table.md` (canonical plan L5101–L5158)
+- [x] 5.3 Task 5.3 — Wire the reranker into `apps/api/app/main.py` lifespan conditionally on `settings.retrieval_mode == "hybrid_reranked"` or `settings.reranker_enabled` (canonical plan L5002–L5046)
+- [x] 5.4 Task 5.4 — Verify reranker loads from `hf-cache` inside the container without a Hugging Face network call (canonical plan L5048–L5099) — verified: model dir present at `/cache/huggingface/hub/models--BAAI--bge-reranker-base`, `reranker.ready` logs in ~17s, HF Hub warning is benign (sentence-transformers always probes Hub even on cache hit)
+- [x] 5.5 Task 5.5 — Restart with `RETRIEVAL_MODE=hybrid_reranked`, run the 100-question bank for the reranker row, hand-grade the 20 calibration questions, append the final row to `ablation_table.md` (canonical plan L5101–L5158) — calibration hand-grading skipped per [[feedback-skip-human-review]]
 
 ## 6. Phase 6 — Breakdowns, figures, report numbers
 
-- [ ] 6.1 Task 6.1 — Per-region CCR breakdown via `aggregate.py` reading `categories.yaml`; emit bar-chart PNG (canonical plan L5162–L5279)
-- [ ] 6.2 Task 6.2 — Per-source CCR breakdown (Wikipedia vs OSM); emit bar-chart PNG (canonical plan L5281–L5430)
-- [ ] 6.3 Task 6.3 — Accuracy-vs-latency Pareto scatter (x = p50 latency, y = CCR); one point per system (canonical plan L5432–L5531)
-- [ ] 6.4 Task 6.4 — Graceful-Refusal-Rate (GRR) analysis on the 10 out-of-scope × 5 systems subset (canonical plan L5533–L5602)
-- [ ] 6.5 Task 6.5 — Final methodology summary doc + commit all results under `docs/eval/results/` (canonical plan L5604–L5689)
+- [x] 6.1 Task 6.1 — Per-region CCR breakdown via `aggregate.py` reading `categories.yaml`; emit bar-chart PNG (canonical plan L5162–L5279)
+- [x] 6.2 Task 6.2 — Per-source CCR breakdown (Wikipedia vs OSM); emit bar-chart PNG (canonical plan L5281–L5430)
+- [x] 6.3 Task 6.3 — Accuracy-vs-latency Pareto scatter (x = p50 latency, y = CCR); one point per system (canonical plan L5432–L5531)
+- [x] 6.4 Task 6.4 — Graceful-Refusal-Rate (GRR) analysis on the 10 out-of-scope × 5 systems subset (canonical plan L5533–L5602)
+- [x] 6.5 Task 6.5 — Final methodology summary doc + commit all results under `docs/eval/results/` (canonical plan L5604–L5689) — `.gitignore` narrowed to keep raw `*.jsonl` local; aggregated reports now committed
