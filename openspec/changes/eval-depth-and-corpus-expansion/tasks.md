@@ -37,10 +37,10 @@ These apply to every task below — do not restate them per task.
 ## 2. Phase 2 — Question bank synthesis & curation (PRE-REGISTER BEFORE PHASE 4)
 
 - [x] 2.1 Task 2.1 — `docs/eval/scripts/synthesize_questions.py` — templates ~150 candidate questions from sampled corpus places (TDD) (canonical plan L2499–L2781)
-- [ ] 2.2 Task 2.2 — Generate seed-places TSV by sampling the expanded corpus (canonical plan L2783–L2893)
-- [ ] 2.3 Task 2.3 — Synthesize ~150 candidates + manually cull to 100 balanced across categories (30 single / 25 multi / 20 geographic / 15 per-neighborhood / 10 out-of-scope) (canonical plan L2895–L2995)
-- [ ] 2.4 Task 2.4 — Write `docs/eval/questions/manhattan-100/categories.yaml` mapping each question to category + region + expected source types (canonical plan L2997–L3069)
-- [ ] 2.5 Commit and `git tag eval/manhattan-100-vN` so the report can cite "question bank @ commit ABCDEF" (canonical plan L2997–L3069 + design D6)
+- [x] 2.2 Task 2.2 — Generate seed-places TSV by sampling the expanded corpus (canonical plan L2783–L2893)
+- [x] 2.3 Task 2.3 — Synthesize ~150 candidates + manually cull to 100 balanced across categories (30 single / 25 multi / 20 geographic / 15 per-neighborhood / 10 out-of-scope) (canonical plan L2895–L2995)
+- [x] 2.4 Task 2.4 — Write `docs/eval/questions/manhattan-100/categories.yaml` mapping each question to category + region + expected source types (canonical plan L2997–L3069)
+- [x] 2.5 Commit and `git tag eval/manhattan-100-vN` so the report can cite "question bank @ commit ABCDEF" (canonical plan L2997–L3069 + design D6) — tagged `eval/manhattan-100-v1` after Phase 2 commit; actual count 95 not 100
 
 ## 3. Phase 3 — Baseline + dense Palimpsest measurement
 

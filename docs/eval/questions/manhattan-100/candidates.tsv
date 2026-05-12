@@ -1,0 +1,96 @@
+question	category	region	expected_source_types	accept	edited_question	notes
+Tell me about the Ritmos 60.	single_place	unknown	osm	Y		
+Tell me about the Joju.	single_place	Upper East Side	osm	Y		
+Tell me about the Bronx Documentary Center.	single_place	unknown	osm	Y		
+Tell me about the Hank’s Pizza.	single_place	Financial District	osm	Y		
+Tell me about the Veterans Memorial Park of Fairview.	single_place	unknown	osm	Y		
+Tell me about the Unique Omakase.	single_place	unknown	osm	Y		
+Tell me about the Music Hall of Williamsburg.	single_place	unknown	osm	Y		
+Tell me about the First Round's on Me Social Club.	single_place	Chelsea	osm	Y		
+Tell me about the McDonald's.	single_place	unknown	osm	Y		
+Tell me about the Santa Barbara Deli.	single_place	unknown	osm	Y		
+Tell me about the Yama Ramen.	single_place	Midtown	osm	Y		
+Tell me about the La Bella.	single_place	unknown	osm	Y		
+Tell me about the Buck House.	single_place	Upper East Side	osm	Y		
+Tell me about the Kyuubi Omakase.	single_place	unknown	osm	Y		
+Tell me about the Gagosian.	single_place	Chelsea	osm	Y		
+Tell me about the Ribalta.	single_place	Midtown	osm	Y		
+Tell me about the Broadway Theatre.	single_place	Midtown	osm	Y		
+Tell me about the Seven Grams Caffé.	single_place	Greenwich Village	osm	Y		
+Tell me about the Ootoya.	single_place	Midtown	osm	Y		
+Tell me about the Dunkin'.	single_place	unknown	osm	Y		
+Tell me about the Trattoria Spaghetto.	single_place	Greenwich Village	osm	Y		
+Tell me about the Proletariat.	single_place	unknown	osm	Y		
+Tell me about the Joe Coffee Company.	single_place	Upper West Side	osm	Y		
+Tell me about the Popeyes.	single_place	Harlem	osm	Y		
+Tell me about the The Bean.	single_place	unknown	osm	Y		
+Tell me about the Food Sing.	single_place	unknown	osm	Y		
+Tell me about the Bagel Boss.	single_place	unknown	osm	Y		
+Tell me about the Geisha Sushi.	single_place	Harlem	osm	Y		
+Tell me about the Softside Ice Cream.	single_place	Morningside Heights	osm	Y		
+Tell me about the Famous Famiglia.	single_place	unknown	osm	Y		
+Plan a walking tour that hits both the Izakaya Noname and the El San Juan Restaurant.	multi_place	unknown / Harlem	osm	Y		
+Plan a walking tour that hits both the Brooklyn-Battery Tunnel Manhattan Plaza and the Frost Restaurant.	multi_place	Financial District / unknown	osm	Y		
+Plan a walking tour that hits both the Moishe's Kosher Bakery and the AbuQir Seafood.	multi_place	Lower East Side / unknown	osm	Y		
+Plan a walking tour that hits both the Applejack Diner and the Caroline's Donuts.	multi_place	Midtown / Upper East Side	osm	Y		
+Plan a walking tour that hits both the Rhythm Zero - Williamsburg and the Blenoir Crêpes and Cafe.	multi_place	unknown / Upper East Side	osm	Y		
+Plan a walking tour that hits both the Jumong Pocha and the Crystal Lake Park.	multi_place	unknown / unknown	osm	Y		
+Plan a walking tour that hits both the 99¢ Pizza and the Dear Mama Coffee.	multi_place	unknown / Upper East Side	osm	Y		
+Plan a walking tour that hits both the Dunkin' and the Black Fox Coffee.	multi_place	unknown / Midtown	osm	Y		
+Plan a walking tour that hits both the West 184th Street and the INTER IAM.	multi_place	Washington Heights / SoHo	osm	Y		
+Plan a walking tour that hits both the Spectacle Theater and the Sarge's Delicatessan & Diner.	multi_place	unknown / Midtown	osm	Y		
+Plan a walking tour that hits both the Thai Son and the Starbucks.	multi_place	SoHo / unknown	osm	Y		
+Plan a walking tour that hits both the Lucky Cheng's and the Subway.	multi_place	Midtown / Harlem	osm	Y		
+Plan a walking tour that hits both the 2788 Bagels and the The Place Pizzeria & Bar.	multi_place	Morningside Heights / unknown	osm	Y		
+Plan a walking tour that hits both the Bowery Meat Company and the Tiltz.	multi_place	SoHo / unknown	osm	Y		
+Plan a walking tour that hits both the Motorino and the Edge.	multi_place	unknown / Chelsea	osm	Y		
+Plan a walking tour that hits both the Fort Lee Museum at the Judge Moore House and the Planet Taco.	multi_place	unknown / Midtown	osm	Y		
+Plan a walking tour that hits both the Dunkin and the Hyake.	multi_place	unknown / SoHo	osm	Y		
+Plan a walking tour that hits both the Da Marino and the The Wolfe.	multi_place	Midtown / Upper West Side	osm	Y		
+Plan a walking tour that hits both the Think Coffee and the Coopers Craft & Kitchen.	multi_place	SoHo / unknown	osm	Y		
+Plan a walking tour that hits both the The Irish Punt and the Karma Gallery.	multi_place	Financial District / Lower East Side	osm	Y		
+Plan a walking tour that hits both the le Réveil and the Lamb's Bread.	multi_place	unknown / Upper East Side	osm	Y		
+Plan a walking tour that hits both the Michael Altman Fine Art and the The New York Society Library.	multi_place	Upper West Side / Upper East Side	osm	Y		
+Plan a walking tour that hits both the Mr. Buncha and the Ebenezer Gospel Tabernacle.	multi_place	unknown / Harlem	osm	Y		
+Plan a walking tour that hits both the Bar Veloce and the Sal's.	multi_place	unknown / unknown	osm	Y		
+Plan a walking tour that hits both the Flex Mussels and the Taco Mahal.	multi_place	Upper East Side / Midtown	osm	Y		
+What interesting places are within 400 meters of Morningside Heights in Manhattan?	geographic	Morningside Heights	osm,wikipedia	Y		
+What interesting places are within 400 meters of Financial District in Manhattan?	geographic	Financial District	osm,wikipedia	Y		
+What interesting places are within 400 meters of Flatiron District in Manhattan?	geographic	Flatiron District	osm,wikipedia	Y		
+What interesting places are within 400 meters of Upper East Side in Manhattan?	geographic	Upper East Side	osm,wikipedia	Y		
+What interesting places are within 400 meters of Greenwich Village in Manhattan?	geographic	Greenwich Village	osm,wikipedia	Y		
+What interesting places are within 400 meters of Harlem in Manhattan?	geographic	Harlem	osm,wikipedia	Y		
+What interesting places are within 400 meters of Tribeca in Manhattan?	geographic	Tribeca	osm,wikipedia	Y		
+What interesting places are within 400 meters of SoHo in Manhattan?	geographic	SoHo	osm,wikipedia	Y		
+What interesting places are within 400 meters of Lower East Side in Manhattan?	geographic	Lower East Side	osm,wikipedia	Y		
+What interesting places are within 400 meters of Midtown in Manhattan?	geographic	Midtown	osm,wikipedia	Y		
+What interesting places are within 400 meters of Washington Heights in Manhattan?	geographic	Washington Heights	osm,wikipedia	Y		
+What interesting places are within 400 meters of Inwood in Manhattan?	geographic	Inwood	osm,wikipedia	Y		
+What interesting places are within 400 meters of Upper West Side in Manhattan?	geographic	Upper West Side	osm,wikipedia	Y		
+What interesting places are within 400 meters of Hell's Kitchen in Manhattan?	geographic	Hell's Kitchen	osm,wikipedia	Y		
+What interesting places are within 400 meters of Chelsea in Manhattan?	geographic	Chelsea	osm,wikipedia	Y		
+Plan a walking tour of Morningside Heights for a first-time visitor.	per_neighborhood	varied	osm,wikipedia	Y		
+Plan a walking tour of Financial District for a first-time visitor.	per_neighborhood	varied	osm,wikipedia	Y		
+Plan a walking tour of Flatiron District for a first-time visitor.	per_neighborhood	varied	osm,wikipedia	Y		
+Plan a walking tour of Upper East Side for a first-time visitor.	per_neighborhood	varied	osm,wikipedia	Y		
+Plan a walking tour of Greenwich Village for a first-time visitor.	per_neighborhood	varied	osm,wikipedia	Y		
+Plan a walking tour of Harlem for a first-time visitor.	per_neighborhood	varied	osm,wikipedia	Y		
+Plan a walking tour of Tribeca for a first-time visitor.	per_neighborhood	varied	osm,wikipedia	Y		
+Plan a walking tour of SoHo for a first-time visitor.	per_neighborhood	varied	osm,wikipedia	Y		
+Plan a walking tour of Lower East Side for a first-time visitor.	per_neighborhood	varied	osm,wikipedia	Y		
+Plan a walking tour of Midtown for a first-time visitor.	per_neighborhood	varied	osm,wikipedia	Y		
+Plan a walking tour of Washington Heights for a first-time visitor.	per_neighborhood	varied	osm,wikipedia	Y		
+Plan a walking tour of Inwood for a first-time visitor.	per_neighborhood	varied	osm,wikipedia	Y		
+Plan a walking tour of Upper West Side for a first-time visitor.	per_neighborhood	varied	osm,wikipedia	Y		
+Plan a walking tour of Hell's Kitchen for a first-time visitor.	per_neighborhood	varied	osm,wikipedia	Y		
+Plan a walking tour of Chelsea for a first-time visitor.	per_neighborhood	varied	osm,wikipedia	Y		
+Take me on a walking tour of brownstones in Brooklyn.	out_of_scope	outside_manhattan		Y		
+What's the history of the Apollo Theater? (note: out of Manhattan scope)	out_of_scope	outside_manhattan		Y		
+Plan a walk through Astoria, Queens.	out_of_scope	outside_manhattan		Y		
+Tell me about the Eiffel Tower.	out_of_scope	outside_manhattan		Y		
+Plan a tour of Roosevelt Island gardens.	out_of_scope	outside_manhattan		Y		
+What's there to see in Hoboken across the river?	out_of_scope	outside_manhattan		Y		
+Show me landmarks in the Bronx Zoo area.	out_of_scope	outside_manhattan		Y		
+Take me to the fictional 'Vandelay Plaza' on 42nd Street.	out_of_scope	outside_manhattan		Y		
+Plan a walking tour of Coney Island.	out_of_scope	outside_manhattan		Y		
+Tell me about Williamsburg's industrial history.	out_of_scope	outside_manhattan		Y		

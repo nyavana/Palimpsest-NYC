@@ -1,0 +1,610 @@
+questions:
+- question: Tell me about the Ritmos 60.
+  category: single_place
+  region: unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Joju.
+  category: single_place
+  region: Upper East Side
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Bronx Documentary Center.
+  category: single_place
+  region: unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: "Tell me about the Hank\u2019s Pizza."
+  category: single_place
+  region: Financial District
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Veterans Memorial Park of Fairview.
+  category: single_place
+  region: unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Unique Omakase.
+  category: single_place
+  region: unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Music Hall of Williamsburg.
+  category: single_place
+  region: unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the First Round's on Me Social Club.
+  category: single_place
+  region: Chelsea
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the McDonald's.
+  category: single_place
+  region: unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Santa Barbara Deli.
+  category: single_place
+  region: unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Yama Ramen.
+  category: single_place
+  region: Midtown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the La Bella.
+  category: single_place
+  region: unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Buck House.
+  category: single_place
+  region: Upper East Side
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Kyuubi Omakase.
+  category: single_place
+  region: unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Gagosian.
+  category: single_place
+  region: Chelsea
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Ribalta.
+  category: single_place
+  region: Midtown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Broadway Theatre.
+  category: single_place
+  region: Midtown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: "Tell me about the Seven Grams Caff\xE9."
+  category: single_place
+  region: Greenwich Village
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Ootoya.
+  category: single_place
+  region: Midtown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Dunkin'.
+  category: single_place
+  region: unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Trattoria Spaghetto.
+  category: single_place
+  region: Greenwich Village
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Proletariat.
+  category: single_place
+  region: unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Joe Coffee Company.
+  category: single_place
+  region: Upper West Side
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Popeyes.
+  category: single_place
+  region: Harlem
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the The Bean.
+  category: single_place
+  region: unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Food Sing.
+  category: single_place
+  region: unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Bagel Boss.
+  category: single_place
+  region: unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Geisha Sushi.
+  category: single_place
+  region: Harlem
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Softside Ice Cream.
+  category: single_place
+  region: Morningside Heights
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Tell me about the Famous Famiglia.
+  category: single_place
+  region: unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the Izakaya Noname and the El San Juan
+    Restaurant.
+  category: multi_place
+  region: unknown / Harlem
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the Brooklyn-Battery Tunnel Manhattan
+    Plaza and the Frost Restaurant.
+  category: multi_place
+  region: Financial District / unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the Moishe's Kosher Bakery and the
+    AbuQir Seafood.
+  category: multi_place
+  region: Lower East Side / unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the Applejack Diner and the Caroline's
+    Donuts.
+  category: multi_place
+  region: Midtown / Upper East Side
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: "Plan a walking tour that hits both the Rhythm Zero - Williamsburg and\
+    \ the Blenoir Cr\xEApes and Cafe."
+  category: multi_place
+  region: unknown / Upper East Side
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the Jumong Pocha and the Crystal Lake
+    Park.
+  category: multi_place
+  region: unknown / unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: "Plan a walking tour that hits both the 99\xA2 Pizza and the Dear Mama\
+    \ Coffee."
+  category: multi_place
+  region: unknown / Upper East Side
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the Dunkin' and the Black Fox Coffee.
+  category: multi_place
+  region: unknown / Midtown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the West 184th Street and the INTER
+    IAM.
+  category: multi_place
+  region: Washington Heights / SoHo
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the Spectacle Theater and the Sarge's
+    Delicatessan & Diner.
+  category: multi_place
+  region: unknown / Midtown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the Thai Son and the Starbucks.
+  category: multi_place
+  region: SoHo / unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the Lucky Cheng's and the Subway.
+  category: multi_place
+  region: Midtown / Harlem
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the 2788 Bagels and the The Place Pizzeria
+    & Bar.
+  category: multi_place
+  region: Morningside Heights / unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the Bowery Meat Company and the Tiltz.
+  category: multi_place
+  region: SoHo / unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the Motorino and the Edge.
+  category: multi_place
+  region: unknown / Chelsea
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the Fort Lee Museum at the Judge Moore
+    House and the Planet Taco.
+  category: multi_place
+  region: unknown / Midtown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the Dunkin and the Hyake.
+  category: multi_place
+  region: unknown / SoHo
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the Da Marino and the The Wolfe.
+  category: multi_place
+  region: Midtown / Upper West Side
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the Think Coffee and the Coopers Craft
+    & Kitchen.
+  category: multi_place
+  region: SoHo / unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the The Irish Punt and the Karma Gallery.
+  category: multi_place
+  region: Financial District / Lower East Side
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: "Plan a walking tour that hits both the le R\xE9veil and the Lamb's Bread."
+  category: multi_place
+  region: unknown / Upper East Side
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the Michael Altman Fine Art and the
+    The New York Society Library.
+  category: multi_place
+  region: Upper West Side / Upper East Side
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the Mr. Buncha and the Ebenezer Gospel
+    Tabernacle.
+  category: multi_place
+  region: unknown / Harlem
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the Bar Veloce and the Sal's.
+  category: multi_place
+  region: unknown / unknown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: Plan a walking tour that hits both the Flex Mussels and the Taco Mahal.
+  category: multi_place
+  region: Upper East Side / Midtown
+  expected_source_types:
+  - osm
+  is_out_of_scope: false
+- question: What interesting places are within 400 meters of Morningside Heights in
+    Manhattan?
+  category: geographic
+  region: Morningside Heights
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: What interesting places are within 400 meters of Financial District in
+    Manhattan?
+  category: geographic
+  region: Financial District
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: What interesting places are within 400 meters of Flatiron District in
+    Manhattan?
+  category: geographic
+  region: Flatiron District
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: What interesting places are within 400 meters of Upper East Side in Manhattan?
+  category: geographic
+  region: Upper East Side
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: What interesting places are within 400 meters of Greenwich Village in
+    Manhattan?
+  category: geographic
+  region: Greenwich Village
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: What interesting places are within 400 meters of Harlem in Manhattan?
+  category: geographic
+  region: Harlem
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: What interesting places are within 400 meters of Tribeca in Manhattan?
+  category: geographic
+  region: Tribeca
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: What interesting places are within 400 meters of SoHo in Manhattan?
+  category: geographic
+  region: SoHo
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: What interesting places are within 400 meters of Lower East Side in Manhattan?
+  category: geographic
+  region: Lower East Side
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: What interesting places are within 400 meters of Midtown in Manhattan?
+  category: geographic
+  region: Midtown
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: What interesting places are within 400 meters of Washington Heights in
+    Manhattan?
+  category: geographic
+  region: Washington Heights
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: What interesting places are within 400 meters of Inwood in Manhattan?
+  category: geographic
+  region: Inwood
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: What interesting places are within 400 meters of Upper West Side in Manhattan?
+  category: geographic
+  region: Upper West Side
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: What interesting places are within 400 meters of Hell's Kitchen in Manhattan?
+  category: geographic
+  region: Hell's Kitchen
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: What interesting places are within 400 meters of Chelsea in Manhattan?
+  category: geographic
+  region: Chelsea
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: Plan a walking tour of Morningside Heights for a first-time visitor.
+  category: per_neighborhood
+  region: varied
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: Plan a walking tour of Financial District for a first-time visitor.
+  category: per_neighborhood
+  region: varied
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: Plan a walking tour of Flatiron District for a first-time visitor.
+  category: per_neighborhood
+  region: varied
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: Plan a walking tour of Upper East Side for a first-time visitor.
+  category: per_neighborhood
+  region: varied
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: Plan a walking tour of Greenwich Village for a first-time visitor.
+  category: per_neighborhood
+  region: varied
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: Plan a walking tour of Harlem for a first-time visitor.
+  category: per_neighborhood
+  region: varied
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: Plan a walking tour of Tribeca for a first-time visitor.
+  category: per_neighborhood
+  region: varied
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: Plan a walking tour of SoHo for a first-time visitor.
+  category: per_neighborhood
+  region: varied
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: Plan a walking tour of Lower East Side for a first-time visitor.
+  category: per_neighborhood
+  region: varied
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: Plan a walking tour of Midtown for a first-time visitor.
+  category: per_neighborhood
+  region: varied
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: Plan a walking tour of Washington Heights for a first-time visitor.
+  category: per_neighborhood
+  region: varied
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: Plan a walking tour of Inwood for a first-time visitor.
+  category: per_neighborhood
+  region: varied
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: Plan a walking tour of Upper West Side for a first-time visitor.
+  category: per_neighborhood
+  region: varied
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: Plan a walking tour of Hell's Kitchen for a first-time visitor.
+  category: per_neighborhood
+  region: varied
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: Plan a walking tour of Chelsea for a first-time visitor.
+  category: per_neighborhood
+  region: varied
+  expected_source_types:
+  - osm
+  - wikipedia
+  is_out_of_scope: false
+- question: Take me on a walking tour of brownstones in Brooklyn.
+  category: out_of_scope
+  region: outside_manhattan
+  expected_source_types: []
+  is_out_of_scope: true
+- question: 'What''s the history of the Apollo Theater? (note: out of Manhattan scope)'
+  category: out_of_scope
+  region: outside_manhattan
+  expected_source_types: []
+  is_out_of_scope: true
+- question: Plan a walk through Astoria, Queens.
+  category: out_of_scope
+  region: outside_manhattan
+  expected_source_types: []
+  is_out_of_scope: true
+- question: Tell me about the Eiffel Tower.
+  category: out_of_scope
+  region: outside_manhattan
+  expected_source_types: []
+  is_out_of_scope: true
+- question: Plan a tour of Roosevelt Island gardens.
+  category: out_of_scope
+  region: outside_manhattan
+  expected_source_types: []
+  is_out_of_scope: true
+- question: What's there to see in Hoboken across the river?
+  category: out_of_scope
+  region: outside_manhattan
+  expected_source_types: []
+  is_out_of_scope: true
+- question: Show me landmarks in the Bronx Zoo area.
+  category: out_of_scope
+  region: outside_manhattan
+  expected_source_types: []
+  is_out_of_scope: true
+- question: Take me to the fictional 'Vandelay Plaza' on 42nd Street.
+  category: out_of_scope
+  region: outside_manhattan
+  expected_source_types: []
+  is_out_of_scope: true
+- question: Plan a walking tour of Coney Island.
+  category: out_of_scope
+  region: outside_manhattan
+  expected_source_types: []
+  is_out_of_scope: true
+- question: Tell me about Williamsburg's industrial history.
+  category: out_of_scope
+  region: outside_manhattan
+  expected_source_types: []
+  is_out_of_scope: true
