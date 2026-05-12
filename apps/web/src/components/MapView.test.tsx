@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 
 import { MapView } from "./MapView";
 import { MapEngineProvider } from "@/state/MapEngineContext";
+import { TourFocusProvider } from "@/state/TourFocusContext";
 import type { Citation, PlannedRoute } from "@/state/types";
 
 // Mocked engine — lets tests drive marker events and assert flyTo / addPath calls.
@@ -157,11 +158,29 @@ beforeEach(() => {
   fakeEngine.clickCb = null;
 });
 
-async function renderMap(props: { walk: PlannedRoute | null; citations: Citation[] }) {
+async function renderMap(props: {
+  walk: PlannedRoute | null;
+  citations: Citation[];
+  candidates?: {
+    doc_id: string;
+    name: string;
+    source_type: "osm";
+    source_url: string;
+    lat: number;
+    lon: number;
+    distance_m: number | null;
+    amenity: string | null;
+    cuisine: string | null;
+    why: string;
+    tags: Record<string, unknown>;
+  }[];
+}) {
   const utils = render(
-    <MapEngineProvider>
-      <MapView {...props} />
-    </MapEngineProvider>,
+    <TourFocusProvider>
+      <MapEngineProvider>
+        <MapView {...props} candidates={props.candidates ?? []} />
+      </MapEngineProvider>
+    </TourFocusProvider>,
   );
   // Wait a microtask for the async `init().then(...)` to fire.
   await act(async () => {
@@ -221,9 +240,11 @@ describe("MapView popup", () => {
     });
 
     rerender(
-      <MapEngineProvider>
-        <MapView walk={null} citations={[]} />
-      </MapEngineProvider>,
+      <TourFocusProvider>
+        <MapEngineProvider>
+          <MapView walk={null} citations={[]} candidates={[]} />
+        </MapEngineProvider>
+      </TourFocusProvider>,
     );
 
     expect(fakeEngine.clearPopup).toHaveBeenCalled();
@@ -291,5 +312,70 @@ describe("MapView path drawing", () => {
       expect(fakeEngine.clearLayer).toHaveBeenCalledWith("walk");
     });
     expect(fakeEngine.addPath).not.toHaveBeenCalled();
+  });
+
+  it("renders a separate marker layer for food candidates", async () => {
+    await renderMap({
+      walk: null,
+      citations: [],
+      candidates: [
+        {
+          doc_id: "osm:node:food-1",
+          name: "Campus Ramen",
+          source_type: "osm",
+          source_url: "https://www.openstreetmap.org/node/1",
+          lat: 40.8072,
+          lon: -73.9641,
+          distance_m: 220,
+          amenity: "restaurant",
+          cuisine: "ramen;japanese",
+          why: "Good match for ramen",
+          tags: {},
+        },
+      ],
+    });
+
+    await waitFor(() => {
+      expect(fakeEngine.addMarkers).toHaveBeenCalledWith(
+        "food-candidates",
+        [
+          expect.objectContaining({
+            id: "food-0",
+            label: "Campus Ramen",
+          }),
+        ],
+      );
+    });
+  });
+
+  it("flies to the first food candidate when a new result set arrives", async () => {
+    await renderMap({
+      walk: null,
+      citations: [],
+      candidates: [
+        {
+          doc_id: "osm:node:food-1",
+          name: "Campus Ramen",
+          source_type: "osm",
+          source_url: "https://www.openstreetmap.org/node/1",
+          lat: 40.8072,
+          lon: -73.9641,
+          distance_m: 220,
+          amenity: "restaurant",
+          cuisine: "ramen;japanese",
+          why: "Good match for ramen",
+          tags: {},
+        },
+      ],
+    });
+
+    await waitFor(() => {
+      expect(fakeEngine.flyTo).toHaveBeenCalledWith(
+        expect.objectContaining({
+          center: { lat: 40.8072, lng: -73.9641 },
+        }),
+        expect.any(Number),
+      );
+    });
   });
 });

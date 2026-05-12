@@ -25,11 +25,14 @@ import {
   type LlmCredentials,
 } from "@/state/llmCredentials";
 import { MapEngineProvider } from "@/state/MapEngineContext";
+import { TourFocusProvider } from "@/state/TourFocusContext";
 import { useAgentSession } from "@/state/useAgentSession";
+import { useFoodDiscovery } from "@/state/useFoodDiscovery";
 import { useServerConfig } from "@/state/useServerConfig";
 
 export default function App() {
   const session = useAgentSession();
+  const foodDiscovery = useFoodDiscovery();
   const { config } = useServerConfig();
   const [credentials, setCredentials] = useState<LlmCredentials | null>(() => readSavedCredentials());
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -49,37 +52,44 @@ export default function App() {
   }, [config, byokRequired, credentials]);
 
   return (
-    <MapEngineProvider>
-      <div className="flex h-full w-full flex-col lg:flex-row">
-        <main className="relative h-[55vh] w-full flex-1 lg:h-full">
-          <MapView walk={session.state.walk} citations={session.state.citations} />
-          <header className="pointer-events-none absolute left-4 top-4 rounded bg-ink/85 px-3 py-2 font-serif text-parchment shadow-chip backdrop-blur-sm">
-            <h1 className="text-h2 font-semibold leading-tight">Palimpsest NYC</h1>
-            <p className="text-small font-sans opacity-80">
-              Walking tours of Morningside Heights & UWS
-            </p>
-          </header>
-        </main>
-        <aside className="h-[45vh] w-full border-l border-hairline lg:h-full lg:w-[28rem]">
-          <ChatPane
-            session={session}
-            byokRequired={byokRequired}
-            credentials={credentials}
-            onOpenSettings={() => setSettingsOpen(true)}
-          />
-        </aside>
-      </div>
-      <SettingsModal
-        isOpen={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        required={byokRequired && credentials === null}
-        defaults={
-          config?.defaults
-            ? { base_url: config.defaults.base_url, model: config.defaults.model }
-            : undefined
-        }
-        onCredentialsChange={(next) => setCredentials(next)}
-      />
-    </MapEngineProvider>
+    <TourFocusProvider>
+      <MapEngineProvider>
+        <div className="flex h-full w-full flex-col lg:flex-row">
+          <main className="relative h-[55vh] w-full flex-1 lg:h-full">
+            <MapView
+              walk={session.state.walk}
+              citations={session.state.citations}
+              candidates={foodDiscovery.state.results}
+            />
+            <header className="pointer-events-none absolute left-4 top-4 rounded bg-ink/85 px-3 py-2 font-serif text-parchment shadow-chip backdrop-blur-sm">
+              <h1 className="text-h2 font-semibold leading-tight">Palimpsest NYC</h1>
+              <p className="text-small font-sans opacity-80">
+                Walking tours of Morningside Heights & UWS
+              </p>
+            </header>
+          </main>
+          <aside className="h-[45vh] w-full border-l border-hairline lg:h-full lg:w-[28rem]">
+            <ChatPane
+              session={session}
+              foodDiscovery={foodDiscovery}
+              byokRequired={byokRequired}
+              credentials={credentials}
+              onOpenSettings={() => setSettingsOpen(true)}
+            />
+          </aside>
+        </div>
+        <SettingsModal
+          isOpen={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          required={byokRequired && credentials === null}
+          defaults={
+            config?.defaults
+              ? { base_url: config.defaults.base_url, model: config.defaults.model }
+              : undefined
+          }
+          onCredentialsChange={(next) => setCredentials(next)}
+        />
+      </MapEngineProvider>
+    </TourFocusProvider>
   );
 }

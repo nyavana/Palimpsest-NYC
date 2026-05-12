@@ -165,6 +165,34 @@ async def test_tool_call_dispatches_and_appends_tool_message():
     assert "wikipedia:X" in {c.doc_id for c in result.citations}
 
 
+async def test_prior_history_messages_are_included_before_current_query():
+    tool = _FixedSearchTool([_hit()])
+    registry = _registry_with(tool)
+    router = _ScriptedRouter(
+        [
+            _resp(
+                tool_calls=[
+                    ToolCall(id="c1", name="search_places", arguments={"query": "x"})
+                ]
+            ),
+            _resp(content=_final_message("wikipedia:X")),
+        ]
+    )
+    loop = AgentLoop(router=router, registry=registry)
+    history = [
+        Message(role="user", content="Tell me about Riverside Church"),
+        Message(role="assistant", content="Riverside Church is a landmark."),
+    ]
+
+    await loop.run("Make it shorter", context=ToolExecutionContext(), history_messages=history)
+
+    first = router.calls[0]
+    assert [m.role for m in first.messages[:4]] == ["system", "user", "assistant", "user"]
+    assert first.messages[1].content == "Tell me about Riverside Church"
+    assert first.messages[2].content == "Riverside Church is a landmark."
+    assert first.messages[3].content == "Make it shorter"
+
+
 # ── Unknown tool name → error message back to LLM (not a crash) ──────
 
 

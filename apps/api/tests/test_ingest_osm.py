@@ -29,6 +29,17 @@ _OVERPASS_PAYLOAD = {
             "center": {"lat": 40.8108, "lon": -73.9626},
             "tags": {"name": "Riverside Church", "amenity": "place_of_worship"},
         },
+        {
+            "type": "node",
+            "id": 54321,
+            "lat": 40.8072,
+            "lon": -73.9641,
+            "tags": {
+                "name": "Campus Ramen",
+                "amenity": "restaurant",
+                "cuisine": "ramen;japanese",
+            },
+        },
         # Element with no name — must be skipped (citations need a label)
         {
             "type": "node",
@@ -60,8 +71,9 @@ def test_iter_records_emits_named_elements_inside_bbox(respx_mock):
     names = {r[0].name for r in records}
     assert "Cathedral of St. John the Divine" in names
     assert "Riverside Church" in names
+    assert "Campus Ramen" in names
     # No-name and out-of-bbox both excluded
-    assert len(records) == 2
+    assert len(records) == 3
 
 
 @respx.mock
@@ -92,6 +104,25 @@ def test_way_uses_center_coords(respx_mock):
     records = list(ingestor.iter_records_sync())
     riverside = next(r[0] for r in records if r[0].name == "Riverside Church")
     assert (riverside.lat, riverside.lon) == (40.8108, -73.9626)
+
+
+@respx.mock
+def test_food_tags_are_preserved_in_embed_text(respx_mock):
+    respx_mock.post(OSM_OVERPASS_URL).mock(
+        return_value=Response(200, json=_OVERPASS_PAYLOAD)
+    )
+    ingestor = OsmIngestor(scope=_BBOX)
+    records = list(ingestor.iter_records_sync())
+    ramen = next(r[0] for r in records if r[0].name == "Campus Ramen")
+    assert ramen.properties == {
+        "tags": {
+            "name": "Campus Ramen",
+            "amenity": "restaurant",
+            "cuisine": "ramen;japanese",
+        }
+    }
+    assert "amenity: restaurant" in ramen.embed_text
+    assert "cuisine: ramen;japanese" in ramen.embed_text
 
 
 def test_doc_id_format():

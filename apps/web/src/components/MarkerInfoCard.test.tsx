@@ -108,4 +108,22 @@ describe("MarkerInfoCard", () => {
     await userEvent.click(screen.getByRole("button", { name: /close/i }));
     expect(onClose).toHaveBeenCalledOnce();
   });
+
+  it("reveal citation button calls onRevealCitation", async () => {
+    mockedHook.mockReturnValue({ status: "error" });
+
+    const onRevealCitation = vi.fn();
+    render(
+      <MarkerInfoCard
+        variant="pinned"
+        stop={stop}
+        citation={citation}
+        onClose={() => {}}
+        onRevealCitation={onRevealCitation}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /reveal citation/i }));
+    expect(onRevealCitation).toHaveBeenCalledOnce();
+  });
 });

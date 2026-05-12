@@ -19,6 +19,20 @@ export type Citation = {
   retrieval_turn: number;
 };
 
+export type FoodCandidate = {
+  doc_id: string;
+  name: string;
+  source_type: SourceType;
+  source_url: string;
+  lat: number;
+  lon: number;
+  distance_m: number | null;
+  amenity: string | null;
+  cuisine: string | null;
+  why: string;
+  tags: Record<string, unknown>;
+};
+
 export type PlannedStop = {
   index: number;
   doc_id: string;
@@ -91,6 +105,21 @@ export type AgentResultPayload = {
   warning: string | null;
   turns: number;
   duration_s: number;
+};
+
+export type ConversationHistoryMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+export type SessionTurn = {
+  question: string;
+  narration: string;
+  citations: Citation[];
+  walk: PlannedRoute | null;
+  warnings: string[];
+  result: AgentResultPayload | null;
+  status: "done" | "error";
 };
 
 /** Payload shapes per `event:` name. Keep in sync with `routes/agent.py`. */

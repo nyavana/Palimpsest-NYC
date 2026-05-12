@@ -6,15 +6,20 @@
  * Spec: design brief §4.6.
  */
 
+import { useEffect, useRef } from "react";
+
 import { sourceTypeColor } from "@/styles/tokens";
 import type { Citation } from "@/state/types";
 
-import { ExternalLinkIcon } from "./Icon";
+import { CrosshairIcon, ExternalLinkIcon } from "./Icon";
 
 type Props = {
   citation: Citation;
   /** Best-effort title pulled from doc_id. */
   title?: string;
+  active?: boolean;
+  focusVersion?: number;
+  onFocus?: () => void;
 };
 
 function titleFromDocId(docId: string): string {
@@ -25,12 +30,31 @@ function titleFromDocId(docId: string): string {
   return slug.replace(/_/g, " ").trim() || docId;
 }
 
-export function CitationCard({ citation, title }: Props) {
+export function CitationCard({
+  citation,
+  title,
+  active = false,
+  focusVersion = 0,
+  onFocus,
+}: Props) {
   const chipColor = sourceTypeColor[citation.source_type];
   const shown = title ?? titleFromDocId(citation.doc_id);
+  const ref = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!active) return;
+    ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [active, focusVersion]);
 
   return (
-    <article className="space-y-2 rounded border border-hairline bg-parchment-deep px-4 py-3">
+    <article
+      ref={ref}
+      className={`space-y-2 rounded border bg-parchment-deep px-4 py-3 transition-colors ${
+        active
+          ? "border-archival-blue shadow-[0_0_0_1px_rgba(83,100,192,0.22)]"
+          : "border-hairline"
+      }`}
+    >
       <header className="flex items-center gap-2">
         <span
           className="rounded px-1.5 py-0.5 font-mono text-mono uppercase tracking-wide text-white"
@@ -38,6 +62,21 @@ export function CitationCard({ citation, title }: Props) {
         >
           {citation.source_type}
         </span>
+        {onFocus !== undefined && (
+          <button
+            type="button"
+            onClick={onFocus}
+            className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border transition-colors focus:outline-none focus:ring-2 focus:ring-ink/40 focus:ring-offset-2 focus:ring-offset-parchment-deep ${
+              active
+                ? "border-archival-blue bg-archival-blue/10 text-archival-blue"
+                : "border-hairline text-ink-muted hover:bg-parchment hover:text-ink"
+            }`}
+            aria-label={`Show ${shown} on the map`}
+            title="Show on map"
+          >
+            <CrosshairIcon className="text-small" />
+          </button>
+        )}
         <a
           href={citation.source_url}
           target="_blank"

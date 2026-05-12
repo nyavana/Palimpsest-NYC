@@ -66,6 +66,34 @@ describe("openAgentStream", () => {
     expect(init.body).toBe(JSON.stringify({ q: "hello world" }));
   });
 
+  it("includes prior conversation history in the POST body when supplied", async () => {
+    const body = makeStream([frame("done", { result: null })]);
+    fetchSpy.mockResolvedValueOnce(new Response(body, { status: 200 }));
+
+    openAgentStream(
+      "make it shorter",
+      { done: () => {} },
+      {
+        history: [
+          { role: "user", content: "Tell me about Riverside Church" },
+          { role: "assistant", content: "Riverside Church is a landmark." },
+        ],
+      },
+    );
+    await flushMicrotasks();
+
+    const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(init.body).toBe(
+      JSON.stringify({
+        q: "make it shorter",
+        history: [
+          { role: "user", content: "Tell me about Riverside Church" },
+          { role: "assistant", content: "Riverside Church is a landmark." },
+        ],
+      }),
+    );
+  });
+
   it("does NOT include X-LLM-Credentials header when no credentials are supplied", async () => {
     const body = makeStream([frame("done", { result: null })]);
     fetchSpy.mockResolvedValueOnce(new Response(body, { status: 200 }));

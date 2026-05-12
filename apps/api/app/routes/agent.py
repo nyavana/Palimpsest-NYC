@@ -46,6 +46,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from app.agent.loop import AgentEvent, AgentLoopError, AgentResult
 from app.agent.tools.base import ToolExecutionContext
 from app.llm.router import LLMRouter, build_byok_router
+from app.llm.models import Message
 from app.meta.session_log import SessionRecord
 
 router = APIRouter()
@@ -70,6 +71,26 @@ class AskBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     q: str = Field(..., min_length=1, description="User question")
+    history: list["ConversationHistoryMessage"] = Field(
+        default_factory=list,
+        description="Prior user/assistant turns to preserve multi-turn context.",
+    )
+
+
+class ConversationHistoryMessage(BaseModel):
+    """Client-supplied prior conversation context.
+
+    Intentionally narrower than `app.llm.models.Message`: callers may only send
+    plain user/assistant text turns. Tool/system messages stay server-owned.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    role: str = Field(..., pattern="^(user|assistant)$")
+    content: str = Field(..., min_length=1)
+
+
+AskBody.model_rebuild()
 
 
 class UserCredentials(BaseModel):
@@ -197,12 +218,23 @@ async def agent_ask(
     q = body.q.strip()
     if not q:
         raise HTTPException(status_code=400, detail="empty query")
+    history = [
+        Message(role=msg.role, content=msg.content)
+        for msg in body.history
+    ]
     # Decoding upfront so the 400 is sent before headers are flushed.
     creds = _decode_credentials_header(x_llm_credentials)
     router_instance, owns_router = _resolve_router(request, creds)
 
     return StreamingResponse(
-        _stream(request, q, router_instance=router_instance, owns_router=owns_router, byok=creds is not None),
+        _stream(
+            request,
+            q,
+            history=history,
+            router_instance=router_instance,
+            owns_router=owns_router,
+            byok=creds is not None,
+        ),
         media_type="text/event-stream",
         headers=SSE_HEADERS,
     )
@@ -212,6 +244,7 @@ async def _stream(
     request: Request,
     q: str,
     *,
+    history: list[Message],
     router_instance: LLMRouter,
     owns_router: bool,
     byok: bool,
@@ -240,7 +273,7 @@ async def _stream(
             terminal_result: AgentResult | None = None
 
             try:
-                async for ev in loop.run_streamed(q, context=context):
+                async for ev in loop.run_streamed(q, context=context, history_messages=history):
                     if ev.type == "done":
                         # Defer emitting `done` until after we relay the
                         # captured walk (if any) so the client sees one

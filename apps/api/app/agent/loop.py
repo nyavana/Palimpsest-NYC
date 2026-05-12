@@ -163,10 +163,18 @@ class AgentLoop:
         self._complexity = complexity  # type: ignore[assignment]
 
     async def run(
-        self, user_query: str, *, context: ToolExecutionContext
+        self,
+        user_query: str,
+        *,
+        context: ToolExecutionContext,
+        history_messages: list[Message] | None = None,
     ) -> AgentResult:
         events: list[AgentEvent] = []
-        async for ev in self.run_streamed(user_query, context=context):
+        async for ev in self.run_streamed(
+            user_query,
+            context=context,
+            history_messages=history_messages,
+        ):
             events.append(ev)
         # The terminal `done` event carries the final result payload.
         done = events[-1]
@@ -175,7 +183,11 @@ class AgentLoop:
         return done.payload["result"]
 
     async def run_streamed(
-        self, user_query: str, *, context: ToolExecutionContext
+        self,
+        user_query: str,
+        *,
+        context: ToolExecutionContext,
+        history_messages: list[Message] | None = None,
     ) -> AsyncIterator[AgentEvent]:
         t0 = time.perf_counter()
         ledger = RetrievalLedger()
@@ -197,10 +209,10 @@ class AgentLoop:
         # search_places ignores this field, so it's a no-op for that tool.
         context.retrieval_ledger = ledger
 
-        messages: list[Message] = [
-            Message(role="system", content=sys_prompt),
-            Message(role="user", content=user_query),
-        ]
+        messages: list[Message] = [Message(role="system", content=sys_prompt)]
+        if history_messages:
+            messages.extend(history_messages)
+        messages.append(Message(role="user", content=user_query))
         tools = self._registry.definitions()
 
         verify_attempts_remaining = 1  # one retry on bad citations

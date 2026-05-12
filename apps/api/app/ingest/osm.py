@@ -10,6 +10,7 @@ License: ODbL 1.0.
 
 from __future__ import annotations
 
+import hashlib
 import time
 from collections.abc import Iterator
 from datetime import datetime, timezone
@@ -43,10 +44,14 @@ def _overpass_query_for_bbox(scope: ScopeBbox) -> str:
 [out:json][timeout:60];
 (
   node["amenity"~"^(place_of_worship|theatre|library|museum|university|college|arts_centre|cinema)$"]["name"]{bbox};
+  node["amenity"~"^(restaurant|cafe|fast_food|bar|pub|bakery|ice_cream)$"]["name"]{bbox};
+  node["shop"~"^(bakery|coffee)$"]["name"]{bbox};
   node["tourism"~"^(attraction|museum|gallery|artwork|viewpoint)$"]["name"]{bbox};
   node["historic"]["name"]{bbox};
   node["leisure"~"^(park|garden)$"]["name"]{bbox};
   way ["amenity"~"^(place_of_worship|theatre|library|museum|university|college|arts_centre|cinema)$"]["name"]{bbox};
+  way ["amenity"~"^(restaurant|cafe|fast_food|bar|pub|bakery|ice_cream)$"]["name"]{bbox};
+  way ["shop"~"^(bakery|coffee)$"]["name"]{bbox};
   way ["tourism"~"^(attraction|museum|gallery|artwork|viewpoint)$"]["name"]{bbox};
   way ["historic"]["name"]{bbox};
   way ["leisure"~"^(park|garden)$"]["name"]{bbox};
@@ -80,7 +85,19 @@ def _embed_text_for(name: str, tags: dict[str, Any]) -> str:
     semantic vector reflects what the place *is*, not just its label.
     """
     parts: list[str] = [name]
-    for k in ("amenity", "tourism", "historic", "leisure", "religion", "denomination"):
+    for k in (
+        "amenity",
+        "shop",
+        "tourism",
+        "historic",
+        "leisure",
+        "religion",
+        "denomination",
+        "cuisine",
+        "outdoor_seating",
+        "takeaway",
+        "opening_hours",
+    ):
         v = tags.get(k)
         if v:
             parts.append(f"{k}: {v}")
@@ -112,7 +129,8 @@ class OsmIngestor:
 
     def iter_records_sync(self) -> Iterator[tuple[PlaceRecord, DocumentRecord | None]]:
         query = _overpass_query_for_bbox(self._scope)
-        cache_key = f"overpass:{self._scope.as_tuple()}"
+        query_digest = hashlib.sha1(query.encode("utf-8")).hexdigest()[:12]
+        cache_key = f"overpass:{self._scope.as_tuple()}:{query_digest}"
         with self._client_factory(timeout=120.0) as client:
             payload = self._cached_or_fetch(
                 cache_key, lambda: _fetch_overpass(client, query)
