@@ -113,6 +113,12 @@ Structural decisions:
 | `infra/osrm/` (existing) | Re-extract OSRM data for the widened bbox; rebuild `.osrm` files. Follow the procedure in `docs/route-planning-2026-05-04.md`. |
 | Ingestion runs | `make nuke && make up` then `python -m app.ingest.cli osm run` and `wikipedia run`. Expected scale: ~3–5k places + ~1.5–2k documents, but verify against actual cardinality (see R1 in §8). |
 
+> **Note (verified 2026-05-12):** `places_name_trgm` (`places.name`) and
+> `documents_body_trgm` (`documents.body`) already exist in
+> `0002_places.sql`. The trigram-index migration in §4.1 is therefore
+> unnecessary; only the optional `0003_widen_scope_indexes.sql` may be
+> needed if the planner's ANALYZE stats trail the new corpus cardinality.
+
 ### 4.2 Retrieval upgrades (behind `RETRIEVAL_MODE`)
 
 | File | Change |

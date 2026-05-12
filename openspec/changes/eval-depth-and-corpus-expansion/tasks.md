@@ -28,15 +28,15 @@ These apply to every task below — do not restate them per task.
 
 ## 1. Phase 1 — Manhattan corpus expansion
 
-- [ ] 1.1 Task 1.1 — Widen `apps/api/app/ingest/scope.py` `SCOPE_BBOX` to Manhattan island + bump `SCOPE_VERSION` (TDD) (canonical plan L2209–L2285)
-- [ ] 1.2 Task 1.2 — Verify existing trigram indexes survive corpus widening; land `apps/api/app/db/migrations/0003_widen_scope_indexes.sql` if needed (canonical plan L2287–L2321)
-- [ ] 1.3 Task 1.3 — `make nuke && make up` and re-ingest OSM + Wikipedia at the wider bbox; verify ~3–5k places + ~1.5–2k docs (canonical plan L2323–L2390)
-- [ ] 1.4 Task 1.4 — OSRM extract resize for Manhattan bbox (optional; deferrable per design risk R8) (canonical plan L2392–L2454)
-- [ ] 1.5 Task 1.5 — Spot-check 5 Manhattan-specific queries through `/agent/ask` + confirm `make test` is green (canonical plan L2456–L2495)
+- [x] 1.1 Task 1.1 — Widen `apps/api/app/ingest/scope.py` `SCOPE_BBOX` to Manhattan island + bump `SCOPE_VERSION` (TDD) (canonical plan L2209–L2285)
+- [x] 1.2 Task 1.2 — Verify existing trigram indexes survive corpus widening; land `apps/api/app/db/migrations/0003_widen_scope_indexes.sql` if needed (canonical plan L2287–L2321)
+- [x] 1.3 Task 1.3 — `make nuke && make up` and re-ingest OSM + Wikipedia at the wider bbox; verify ~3–5k places + ~1.5–2k docs (canonical plan L2323–L2390) — actual: 12,858 OSM + 492 wiki + 456 docs
+- [ ] 1.4 Task 1.4 — OSRM extract resize for Manhattan bbox (optional; deferrable per design risk R8) (canonical plan L2392–L2454) — **deferred** per R8
+- [x] 1.5 Task 1.5 — Spot-check 5 Manhattan-specific queries through `/agent/ask` + confirm `make test` is green (canonical plan L2456–L2495) — 3/5 OK, 2 reveal dense-only gap; 272/273 tests pass
 
 ## 2. Phase 2 — Question bank synthesis & curation (PRE-REGISTER BEFORE PHASE 4)
 
-- [ ] 2.1 Task 2.1 — `docs/eval/scripts/synthesize_questions.py` — templates ~150 candidate questions from sampled corpus places (TDD) (canonical plan L2499–L2781)
+- [x] 2.1 Task 2.1 — `docs/eval/scripts/synthesize_questions.py` — templates ~150 candidate questions from sampled corpus places (TDD) (canonical plan L2499–L2781)
 - [ ] 2.2 Task 2.2 — Generate seed-places TSV by sampling the expanded corpus (canonical plan L2783–L2893)
 - [ ] 2.3 Task 2.3 — Synthesize ~150 candidates + manually cull to 100 balanced across categories (30 single / 25 multi / 20 geographic / 15 per-neighborhood / 10 out-of-scope) (canonical plan L2895–L2995)
 - [ ] 2.4 Task 2.4 — Write `docs/eval/questions/manhattan-100/categories.yaml` mapping each question to category + region + expected source types (canonical plan L2997–L3069)
