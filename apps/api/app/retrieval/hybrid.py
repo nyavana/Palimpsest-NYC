@@ -7,7 +7,6 @@ fan-out is larger than the caller's `limit` so RRF has room to swap items.
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any, Protocol
 
 from app.agent.tools.search_places import SearchPlaceHit
@@ -61,23 +60,25 @@ class HybridRetriever:
         limit: int,
     ) -> list[SearchPlaceHit]:
         branch_limit = limit * self._fanout
-        dense_hits, sparse_hits = await asyncio.gather(
-            self._dense.search(
-                session=session,
-                embedder=embedder,
-                query=query,
-                near=near,
-                radius_m=radius_m,
-                limit=branch_limit,
-            ),
-            self._sparse.search(
-                session=session,
-                embedder=embedder,
-                query=query,
-                near=near,
-                radius_m=radius_m,
-                limit=branch_limit,
-            ),
+        # Serialize the two branches: SQLAlchemy AsyncSession is not concurrency-
+        # safe within a single session, and the caller passes one shared session.
+        # The latency cost is small (sparse pg_trgm + dense pgvector are each
+        # ~20-50ms) and avoids plumbing a session_factory through the protocol.
+        dense_hits = await self._dense.search(
+            session=session,
+            embedder=embedder,
+            query=query,
+            near=near,
+            radius_m=radius_m,
+            limit=branch_limit,
+        )
+        sparse_hits = await self._sparse.search(
+            session=session,
+            embedder=embedder,
+            query=query,
+            near=near,
+            radius_m=radius_m,
+            limit=branch_limit,
         )
 
         # Build doc_id → hit lookup. Prefer dense's hit when both have it
