@@ -130,6 +130,12 @@ class Settings(BaseSettings):
 
     osrm_base_url: str = Field(default="http://osrm:5000", alias="OSRM_BASE_URL")
 
+    retrieval_mode: str = Field(default="dense", alias="RETRIEVAL_MODE")
+    reranker_model: str = Field(
+        default="BAAI/bge-reranker-base", alias="RERANKER_MODEL"
+    )
+    reranker_enabled: bool = Field(default=False, alias="RERANKER_ENABLED")
+
     openrouter: OpenRouterSettings = Field(default_factory=OpenRouterSettings)  # type: ignore[arg-type]
     local_llm: LocalLLMSettings = Field(default_factory=LocalLLMSettings)
     embeddings: EmbeddingsSettings = Field(default_factory=EmbeddingsSettings)

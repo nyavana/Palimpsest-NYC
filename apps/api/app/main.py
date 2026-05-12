@@ -121,8 +121,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # constructed.
     # TODO(wave-4): once routes/agent.py builds ToolExecutionContext with
     #   routing_backend=app.state.routing_backend, this comment can be deleted.
+    # Build the retriever once and share it between the agent tool and the
+    # /internal/retrieve endpoint. Coupling them keeps Phase 4's ablation rows
+    # honest (naive_rag-{mode} vs palimpsest-{mode} isolates only the agent
+    # loop, not the retrieval pipeline). See task 4.5 Step 6.
+    from app.retrieval.factory import build_retriever
+
+    retriever = build_retriever(
+        mode=settings.retrieval_mode,
+        reranker=getattr(app.state, "reranker", None),
+    )
+    app.state.retriever_for_internal = retriever
     tool_registry = ToolRegistry()
-    tool_registry.register(SearchPlacesTool())
+    tool_registry.register(
+        SearchPlacesTool(
+            retriever=retriever,
+            mode=settings.retrieval_mode,
+            reranker=getattr(app.state, "reranker", None),
+        )
+    )
     tool_registry.register(PlanWalkTool())
     app.state.agent_tool_registry = tool_registry
     # The builder receives the per-request router (resolved by the route

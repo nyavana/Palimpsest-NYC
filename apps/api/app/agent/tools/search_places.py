@@ -138,8 +138,18 @@ class SearchPlacesTool(Tool):
     )
     parameters = _PARAMETERS
 
-    def __init__(self, *, retriever: _RetrieverProtocol | None = None) -> None:
-        self._retriever = retriever or PostgresRetriever()
+    def __init__(
+        self,
+        *,
+        retriever: _RetrieverProtocol | None = None,
+        mode: str = "dense",
+        reranker: Any = None,
+    ) -> None:
+        if retriever is not None:
+            self._retriever = retriever
+        else:
+            from app.retrieval.factory import build_retriever
+            self._retriever = build_retriever(mode=mode, reranker=reranker)
 
     async def execute(
         self, args: dict[str, Any], context: ToolExecutionContext
