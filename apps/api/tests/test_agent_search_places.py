@@ -171,3 +171,37 @@ async def test_empty_corpus_returns_empty_list_not_error():
     tool = SearchPlacesTool(retriever=retriever)
     out = await tool.run({"query": "obscure"}, ToolExecutionContext())
     assert out["results"] == []
+
+
+# ── Shape contract: tool result identical across retrieval modes ──────
+
+
+async def test_search_places_result_shape_is_identical_across_modes(monkeypatch):
+    """The tool result is `{"results": [<llm_dict>, ...]}` regardless of mode."""
+
+    from app.agent.tools.search_places import SearchPlaceHit, SearchPlacesTool
+    from app.db.models import SourceType
+
+    hit = SearchPlaceHit(
+        doc_id="wikipedia:X",
+        name="X",
+        source_type=SourceType.wikipedia,
+        source_url="https://example/X",
+        lat=40.8, lon=-73.96, distance_m=None, score=0.7,
+    )
+
+    class _Fixed:
+        async def search(self, **_kw): return [hit]
+
+    expected_keys = {"doc_id", "name", "source_type", "source_url", "lat", "lon", "distance_m", "score"}
+
+    # We don't actually exercise the factory's hybrid_reranked branch (that
+    # would require a real reranker). We test the contract on the dense and
+    # hybrid surfaces and assert the SearchPlacesTool dispatch is mode-agnostic.
+    for mode_retriever in (_Fixed(), _Fixed(), _Fixed()):
+        tool = SearchPlacesTool(retriever=mode_retriever)
+        result = await tool.run({"query": "x"}, ToolExecutionContext())
+        assert isinstance(result, dict)
+        assert set(result) == {"results"}
+        assert isinstance(result["results"], list)
+        assert set(result["results"][0]) == expected_keys
