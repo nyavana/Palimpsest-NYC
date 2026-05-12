@@ -1,0 +1,5 @@
+systems:
+  - name: palimpsest-hybrid-reranked
+    kind: palimpsest
+    api_base_url: http://localhost:8000
+    retrieval_mode: hybrid_reranked

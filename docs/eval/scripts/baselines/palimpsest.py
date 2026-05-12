@@ -35,38 +35,55 @@ _FLATTENABLE_TOOLS = ("search_places", "plan_walk")
 
 
 def flatten_retrieved_docs(frames: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Collect every doc_id-bearing entry from tool_result frames.
+    """Collect every doc_id-bearing entry from SSE frames.
 
-    Dedupes by doc_id (first-seen wins, so the earliest score/score_origin is
-    preserved). The shape matches /internal/retrieve's RetrieveResult except
-    `body_excerpt` is filled in afterwards by run_palimpsest().
+    Sources, in priority order (first-seen wins for dedup so earliest score wins):
+      1. `tool_result` frames whose tool emits hits inline. The V1 SSE schema
+         for `search_places` returns only `{name, n_hits}` and so contributes
+         nothing here in practice; `plan_walk` is the same shape. Kept for
+         forward-compat if the schema ever widens.
+      2. `walk` frames — `discovered_stops[]` carries hit-shaped dicts.
+      3. `citations` frames — the terminal source of doc_ids the agent cited.
+         Schema is `{doc_id, source_url, source_type, span, retrieval_turn}`
+         (no name/lat/lon/score), so those fields are null on this path.
+
+    body_excerpt is left empty here and filled afterwards by run_palimpsest()
+    via /internal/documents/by_ids.
     """
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
+
+    def _add(hit: dict[str, Any], from_source: str) -> None:
+        doc_id = hit.get("doc_id")
+        if not doc_id or doc_id in seen:
+            return
+        seen.add(doc_id)
+        out.append({
+            "doc_id": doc_id,
+            "name": hit.get("name"),
+            "source_type": hit.get("source_type"),
+            "source_url": hit.get("source_url"),
+            "lat": hit.get("lat"),
+            "lon": hit.get("lon"),
+            "score": hit.get("score"),
+            "body_excerpt": "",
+            "from_tool": from_source,
+        })
+
     for fr in frames:
-        if fr.get("event") != "tool_result":
-            continue
+        event = fr.get("event")
         data = fr.get("data") or {}
-        if data.get("name") not in _FLATTENABLE_TOOLS:
-            continue
-        result = data.get("result") or {}
-        for key in ("results", "discovered_stops", "stops"):
-            for hit in result.get(key) or []:
-                doc_id = hit.get("doc_id")
-                if not doc_id or doc_id in seen:
-                    continue
-                seen.add(doc_id)
-                out.append({
-                    "doc_id": doc_id,
-                    "name": hit.get("name"),
-                    "source_type": hit.get("source_type"),
-                    "source_url": hit.get("source_url"),
-                    "lat": hit.get("lat"),
-                    "lon": hit.get("lon"),
-                    "score": hit.get("score"),
-                    "body_excerpt": "",  # filled by enrichment step
-                    "from_tool": data.get("name"),
-                })
+        if event == "tool_result" and data.get("name") in _FLATTENABLE_TOOLS:
+            result = data.get("result") or {}
+            for key in ("results", "discovered_stops", "stops"):
+                for hit in result.get(key) or []:
+                    _add(hit, data.get("name") or "tool_result")
+        elif event == "walk":
+            for hit in data.get("discovered_stops") or []:
+                _add(hit, "walk")
+        elif event == "citations":
+            for hit in data.get("citations") or []:
+                _add(hit, "citation")
     return out
 
 
