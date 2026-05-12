@@ -1,0 +1,23 @@
+# Phase-0 smoke run subset. Only the 3 systems whose underlying retrieval
+# pipeline exists today (dense). Hybrid and reranker variants are added in
+# Phase 4 / Phase 5; running them now against a dense-only api would emit
+# duplicate rows with misleading retrieval_mode labels.
+systems:
+  - name: vanilla
+    kind: vanilla_llm
+    model: moonshotai/kimi-k2.6-20260420
+    base_url: https://openrouter.ai/api/v1
+    temperature: 0.0
+
+  - name: naive_rag
+    kind: naive_rag
+    model: moonshotai/kimi-k2.6-20260420
+    base_url: https://openrouter.ai/api/v1
+    temperature: 0.0
+    retrieve_top_k: 8
+    retrieve_url: http://localhost:8000/internal/retrieve
+
+  - name: palimpsest-dense
+    kind: palimpsest
+    api_base_url: http://localhost:8000
+    retrieval_mode: dense

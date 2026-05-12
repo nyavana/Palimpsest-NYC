@@ -24,7 +24,7 @@ These apply to every task below — do not restate them per task.
 - [x] 0.7 Task 0.6 — Grader rubric `docs/eval/scripts/graders/{rubric,llm_judge}.py` + per-metric prompts (CCR/HR/FA/NQ/GRR) (TDD) (canonical plan L1540–L1726)
 - [x] 0.8 Task 0.7 — OpenRouter + retrieve HTTP clients `docs/eval/scripts/openrouter_client.py` and `retrieve_client.py` + `tests/test_clients.py` (TDD) (canonical plan L1728–L1859). Note: `sse_client.py` and `document_client.py` belong to Task 0.5 (Palimpsest baseline).
 - [x] 0.9 Task 0.8 — `docs/eval/scripts/run_eval_v2.py` orchestrator + cost-cap enforcement (TDD) (canonical plan L1861–L2090)
-- [ ] 0.10 Task 0.9 — Phase-0 smoke run against the existing 15-question bench; hand-grade 3 rows; compute κ against the judge (canonical plan L2092–L2205)
+- [x] 0.10 Task 0.9 — Phase-0 smoke run against the existing 15-question bench; hand-grade 3 rows; compute κ against the judge (canonical plan L2092–L2205) — plumbing validated 2026-05-12; κ skipped per [[feedback-skip-human-review]]; two issues filed in `docs/eval/notes/2026-05-12-phase0-smoke.md`
 
 ## 1. Phase 1 — Manhattan corpus expansion
 

@@ -24,7 +24,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import bindparam, text
+from sqlalchemy import text
 
 from app.agent.tools.search_places import DEFAULT_LIMIT, PostgresRetriever
 
@@ -81,14 +81,12 @@ class _DefaultBodyFetcher:
     async def fetch(self, session, doc_ids: list[str], *, max_chars: int) -> dict[str, str]:
         if not doc_ids:
             return {}
-        stmt = (
-            text(
-                "SELECT doc_id, LEFT(body, :n) AS excerpt FROM documents "
-                "WHERE doc_id = ANY(:ids)"
-            )
-            .bindparams(bindparam("ids", expanding=True))
+        stmt = text(
+            "SELECT p.doc_id AS doc_id, LEFT(d.body, :n) AS excerpt "
+            "FROM documents d JOIN places p ON p.id = d.place_id "
+            "WHERE p.doc_id = ANY(:ids)"
         )
-        result = await session.execute(stmt, {"n": max_chars, "ids": doc_ids})
+        result = await session.execute(stmt, {"n": max_chars, "ids": list(doc_ids)})
         return {row.doc_id: (row.excerpt or "") for row in result}
 
 
