@@ -5,11 +5,13 @@
 \usepackage{hyperref}
 \usepackage{enumitem}
 
+\setlength{\emergencystretch}{3em}
+
 \settopmatter{printacmref=false}
 \renewcommand\footnotetextcopyrightpermission[1]{}
 \pagestyle{plain}
 
-\title{Palimpsest NYC: A Citation-Grounded Agentic Walking-Tour System for Morningside Heights and the Upper West Side}
+\title{Palimpsest NYC: A Citation-Grounded Agentic Walking-Tour System for Manhattan}
 
 \author{Thomas Duan}
 \affiliation{%
@@ -48,7 +50,7 @@ Palimpsest NYC is an agentic walking-tour system that answers place-based questi
 \maketitle
 
 \section{Introduction and Problem Formulation}
-Large language models are now strong enough to produce convincing urban narratives, but a city-guide application has a higher bar than general chat. It has to connect generated text to real places, stay geographically bounded, and expose enough structure that a user can verify where claims come from. In a walking-tour setting, a hallucinated location or an unsupported claim directly weakens trust. Palimpsest NYC works inside a narrow but realistic domain: short walking tours in Morningside Heights and the Upper West Side, grounded in public-domain sources.
+Large language models are now strong enough to produce convincing urban narratives, but a city-guide application has a higher bar than general chat. It has to connect generated text to real places, stay geographically bounded, and expose enough structure that a user can verify where claims come from. In a walking-tour setting, a hallucinated location or an unsupported claim directly weakens trust. Palimpsest NYC works inside a narrow but realistic domain: short walking tours in Manhattan, grounded in public-domain sources.
 
 The core question we ask is: \emph{can we build an end-to-end LLM application that produces useful, map-aware urban narration while enforcing citation correctness at generation time rather than treating grounding as a post-hoc add-on?} Our answer is a constrained agentic system in which retrieval, routing, and rendering are all first-class components. The backend retrieves candidate places and documents, the agent chooses whether to search or plan a route, a verifier checks the final citation set, and the frontend renders the narration and the route as one synchronized experience.
 
@@ -71,7 +73,7 @@ A \texttt{RetrievalMode} factory reads the \texttt{RETRIEVAL\_MODE} env flag at 
 \begin{table}[t]
   \caption{Core system components and responsibilities.}
   \label{tab:components}
-  \begin{tabular}{p{0.2\linewidth} p{0.72\linewidth}}
+  \begin{tabular}{p{0.32\linewidth} p{0.60\linewidth}}
     \toprule
     Component & Responsibility \\
     \midrule
@@ -116,11 +118,11 @@ The LLM call path has two router tiers, \texttt{local} and \texttt{openrouter}, 
 \section{Evaluation and Results}\label{sec:evaluation}
 We evaluate Palimpsest against the pre-registered \texttt{manhattan-100} question bank (tagged \texttt{eval/manhattan-100-v1}). The bank contains 95 questions: 85 in-scope items spanning roughly twenty Manhattan neighborhood tags plus the \texttt{varied} and \texttt{unknown} buckets, and 10 out-of-scope controls (Brooklyn, Queens, Bronx, out-of-state, and fictional places) used to score refusal behavior. We froze the bank before running any of the five systems against it.
 
-The ablation compares five systems: \texttt{vanilla} (LLM with no retrieval), \texttt{naive\_rag} (top-$k$ retrieval concatenated into the prompt), \texttt{palimpsest-dense}, \texttt{palimpsest-hybrid}, and \texttt{palimpsest-hybrid-reranked}. All five are served by \texttt{openai/gpt-5.4-mini} through OpenRouter, so the model is held constant; the three Palimpsest variants differ only by the \texttt{RETRIEVAL\_MODE} boot flag and the reranker-enabled toggle.
+The ablation compares five systems: \texttt{vanilla} (LLM with no retrieval), \texttt{naive\_rag} (top-$k$ retrieval concatenated into the prompt), \texttt{palimpsest-dense}, \texttt{palimpsest-hybrid}, and \texttt{palimpsest-hybrid-\allowbreak reranked}. All five are served by \texttt{openai/\allowbreak gpt-5.4-mini} through OpenRouter, so the model is held constant; the three Palimpsest variants differ only by the \texttt{RETRIEVAL\_MODE} boot flag and the reranker-enabled toggle.
 
 We report five metrics with 95\% bootstrap confidence intervals over 1000 resamples: CCR (citation-correctness rate), HR (hallucination rate, lower is better), FA (false-attribution count per response), NQ (narration quality on a 1--5 Likert), and GRR (grounded refusal rate on the out-of-scope subset, higher is better). The judge is \texttt{gpt-5.4-mini} served through OpenRouter; this is the same model class as the systems under evaluation, which is a self-grading risk we flag in the methodology caveats below. Total judge spend is approximately \$1.60 over roughly 1550 calls.
 
-\begin{table}[t]
+\begin{table*}[t]
   \caption{Headline ablation on the pre-registered \texttt{manhattan-100} bank ($n=95$); mean [95\% bootstrap CI]. FA omitted (see prose).}
   \label{tab:ablation}
   \small
@@ -132,16 +134,16 @@ We report five metrics with 95\% bootstrap confidence intervals over 1000 resamp
     \texttt{naive\_rag} & 95 & 0.856 [0.791, 0.914] & 0.313 [0.242, 0.388] & 3.41 [3.24, 3.59] & 0.700 [0.400, 1.000] \\
     \texttt{palimpsest-dense} & 95 & 0.725 [0.648, 0.797] & 0.708 [0.621, 0.786] & 3.44 [3.29, 3.58] & 0.400 [0.100, 0.700] \\
     \texttt{palimpsest-hybrid} & 95 & 0.751 [0.683, 0.815] & 0.620 [0.530, 0.717] & 3.45 [3.30, 3.59] & 0.500 [0.200, 0.800] \\
-    \texttt{palimpsest-hybrid-reranked} & 95 & 0.755 [0.678, 0.818] & 0.794 [0.722, 0.860] & 3.52 [3.39, 3.64] & 0.200 [0.000, 0.500] \\
+    \texttt{palimpsest-hybrid-\allowbreak reranked} & 95 & 0.755 [0.678, 0.818] & 0.794 [0.722, 0.860] & 3.52 [3.39, 3.64] & 0.200 [0.000, 0.500] \\
     \bottomrule
   \end{tabular}
-\end{table}
+\end{table*}
 
 Naive RAG posts the highest CCR in the table at 0.856, but this is a construction artifact rather than a quality claim. \texttt{naive\_rag} concatenates the entire top-$k$ retrieved set verbatim into the prompt, so any \texttt{doc\_id} the model cites is present in the retrieved set by construction; CCR collapses to ``did the model cite something from the block of text we just handed it.'' The three Palimpsest configurations instead invoke retrieval as agent tools across multiple turns and cite a smaller, targeted subset per turn, so their CCR is a stricter test of citation grounding. The meaningful comparison is therefore among the Palimpsest variants.
 
 Moving from \texttt{palimpsest-dense} to \texttt{palimpsest-hybrid} yields $+2.6\,\mathrm{pp}$ CCR (0.725 $\to$ 0.751) and $-8.8\,\mathrm{pp}$ HR (0.708 $\to$ 0.620). RRF fusion ($k=60$) of dense \texttt{bge-small} cosine scores with sparse \texttt{pg\_trgm} name similarity recovers proper-name lookups that pure dense embeddings miss. We tracked two diagnostic cases through the run: Inwood Hill Park and the Lower East Side Tenement Museum. Both are present in the corpus, but the dense embedding ranks similarly-named community gardens and other \texttt{tenement}-prefixed entries above them, and hybrid retrieval pulls the canonical record back to the top of the result set. FA also moves with this transition (hybrid FA $= 1.422$ vs dense FA $= 1.029$); the agent surfaces more candidates and occasionally over-attributes.
 
-The \texttt{palimpsest-hybrid} $\to$ \texttt{palimpsest-hybrid-reranked} move is the most unflattering line in the table, and we report it plainly. CCR rises by $+0.4\,\mathrm{pp}$ (0.751 $\to$ 0.755), well inside the bootstrap CI. HR regresses by $+17.4\,\mathrm{pp}$ (0.620 $\to$ 0.794), and GRR collapses from 0.500 to 0.200 on the 10 out-of-scope controls. FA does soften slightly (reranker FA $= 1.176$ vs hybrid FA $= 1.422$), so the reranker reduces over-attribution somewhat on the cases where it cites at all; vanilla FA $= 0.989$ is misleading because vanilla almost never cites. Our reading is that reranker tuning is an \emph{agent-prompt} concern, not just a retrieval-quality concern: when the cross-encoder surfaces more topically-relevant candidates, the agent treats them as license to make more claims, including on questions where it should refuse. The fix belongs in the agent prompt that adjudicates which retrieved candidates make it into the citation set, not in the retriever stack.
+The \texttt{palimpsest-hybrid} $\to$ \texttt{palimpsest-hybrid-\allowbreak reranked} move is the most unflattering line in the table, and we report it plainly. CCR rises by $+0.4\,\mathrm{pp}$ (0.751 $\to$ 0.755), well inside the bootstrap CI. HR regresses by $+17.4\,\mathrm{pp}$ (0.620 $\to$ 0.794), and GRR collapses from 0.500 to 0.200 on the 10 out-of-scope controls. FA does soften slightly (reranker FA $= 1.176$ vs hybrid FA $= 1.422$), so the reranker reduces over-attribution somewhat on the cases where it cites at all; vanilla FA $= 0.989$ is misleading because vanilla almost never cites. Our reading is that reranker tuning is an \emph{agent-prompt} concern, not just a retrieval-quality concern: when the cross-encoder surfaces more topically-relevant candidates, the agent treats them as license to make more claims, including on questions where it should refuse. The fix belongs in the agent prompt that adjudicates which retrieved candidates make it into the citation set, not in the retriever stack.
 
 \begin{figure}[t]
   \centering
@@ -154,10 +156,10 @@ Five methodology caveats bound how strongly these numbers should be read:
 
 \begin{itemize}[leftmargin=*,itemsep=2pt,topsep=2pt]
   \item \textbf{v2 CCR rubric.} OSM rows store name, URL, and coordinates but no prose, so \texttt{body\_excerpt} is empty by corpus design. The v2 rubric (\texttt{prompt\_version: v2}) accepts \texttt{doc\_id $\in$ retrieved\_docs} as sufficient grounding when the body is empty; v1 of the rubric scored every OSM citation to 0 and is no longer trustworthy for this corpus.
-  \item \textbf{Doc-ID harvesting.} We reconstruct \texttt{retrieved\_docs} from the terminal \texttt{citations} frame and from \texttt{walk.discovered\_stops[]}, not from a tool-result ledger: the V1 SSE schema only exposes \texttt{\{name, n\_hits\}} per tool call. This undercounts the HR denominator, because any retrieved-but-uncited document is invisible to the eval.
+  \item \textbf{Doc-ID harvesting.} We reconstruct \texttt{retrieved\_docs} from the terminal \texttt{citations} frame and from \texttt{walk.\allowbreak discovered\_stops[]}, not from a tool-result ledger: the V1 SSE schema only exposes \texttt{\{name, n\_hits\}} per tool call. This undercounts the HR denominator, because any retrieved-but-uncited document is invisible to the eval.
   \item \textbf{LLMCache contamination.} All five systems share a Redis-backed prompt cache across the 95-question run. Correctness metrics (CCR/HR/FA/NQ/GRR) are unaffected, but latency and cost are deflated asymmetrically across systems and turn counts; the Pareto figure (Figure~\ref{fig:pareto}) should be read as warm-cache shape, not cold-start cost.
   \item \textbf{Self-grading judge.} \texttt{gpt-5.4-mini} is both the system model and the judge model. This is a documented self-grading risk and is not mitigated by an independent grader in this run; an independent judge (e.g., \texttt{claude-opus-4-7}) would resolve it at $\sim$3--5$\times$ judge cost via a one-flag change to \texttt{judge\_run.py}.
-  \item \textbf{Inter-rater $\kappa$ deferred.} The \texttt{kappa} cell in the ablation table is \texttt{null}. Hand-grading the calibration worksheet at \texttt{docs/eval/grades/calibration.csv} and re-running \texttt{aggregate.py --hand-grades} recovers the number; we defer that step in this revision.
+  \item \textbf{Inter-rater $\kappa$ deferred.} The \texttt{kappa} cell in the ablation table is \texttt{null}. Hand-grading the calibration worksheet at \texttt{docs/\allowbreak eval/\allowbreak grades/\allowbreak calibration.csv} and re-running \texttt{aggregate.py --hand-grades} recovers the number; we defer that step in this revision.
 \end{itemize}
 
 \section{Discussion, Limitations, and Insights}
