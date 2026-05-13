@@ -1,0 +1,16 @@
+# Pinned judge config. Bump prompt_version any time the rubric prompts change
+# so re-runs against the same model can be distinguished from rubric edits.
+model: anthropic/claude-opus-4-7
+base_url: https://openrouter.ai/api/v1
+temperature: 0.0
+max_tokens: 1024
+prompt_version: v2
+# Metrics covered by the judge. CCR and HR are scored on every row;
+# FA only on the calibration set + sample (see aggregate.py); NQ on all.
+# GRR is binary and only meaningful on out-of-scope questions.
+metrics:
+  - ccr
+  - hr
+  - fa
+  - nq
+  - grr

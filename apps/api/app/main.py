@@ -25,7 +25,7 @@ from app.llm.cache import CacheTtl, LLMCache
 from app.llm.router import build_llm_router
 from app.llm.telemetry import TelemetrySink
 from app.logging import configure_logging, get_logger
-from app.routes import agent, config, health, llm, meta, places
+from app.routes import agent, config, health, internal_retrieve, llm, meta, places
 from app.routing import OsrmBackend
 
 log = get_logger(__name__)
@@ -105,6 +105,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.embedder = build_embedder(settings.embeddings)
     log.info("embedder.ready", dim=app.state.embedder.dim)
 
+    # Reranker singleton — loaded only when needed. CPU-only.
+    if settings.reranker_enabled or settings.retrieval_mode == "hybrid_reranked":
+        log.info("reranker.loading", model=settings.reranker_model)
+        from app.embeddings.reranker import build_reranker
+
+        app.state.reranker = build_reranker(settings.reranker_model)
+        log.info("reranker.ready")
+    else:
+        app.state.reranker = None
+
     # Routing backend (V1 = OSRM in-cluster). The backend opens a fresh
     # httpx.AsyncClient per `route()` call so there is no connection pool
     # to dispose on shutdown.
@@ -121,8 +131,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # constructed.
     # TODO(wave-4): once routes/agent.py builds ToolExecutionContext with
     #   routing_backend=app.state.routing_backend, this comment can be deleted.
+    # Build the retriever once and share it between the agent tool and the
+    # /internal/retrieve endpoint. Coupling them keeps Phase 4's ablation rows
+    # honest (naive_rag-{mode} vs palimpsest-{mode} isolates only the agent
+    # loop, not the retrieval pipeline). See task 4.5 Step 6.
+    from app.retrieval.factory import build_retriever
+
+    retriever = build_retriever(
+        mode=settings.retrieval_mode,
+        reranker=getattr(app.state, "reranker", None),
+    )
+    app.state.retriever_for_internal = retriever
     tool_registry = ToolRegistry()
-    tool_registry.register(SearchPlacesTool())
+    tool_registry.register(
+        SearchPlacesTool(
+            retriever=retriever,
+            mode=settings.retrieval_mode,
+            reranker=getattr(app.state, "reranker", None),
+        )
+    )
     tool_registry.register(PlanWalkTool())
     app.state.agent_tool_registry = tool_registry
     # The builder receives the per-request router (resolved by the route
@@ -180,6 +207,7 @@ def create_app() -> FastAPI:
     app.include_router(meta.router, prefix="/internal", tags=["meta"])
     app.include_router(places.router)
     app.include_router(agent.router)
+    app.include_router(internal_retrieve.router)
 
     # ── Exception handlers ────────────────────────────────────
     @app.exception_handler(Exception)

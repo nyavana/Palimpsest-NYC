@@ -10,14 +10,14 @@
 
 Palimpsest plans a short walking tour for a bounded slice of NYC and narrates it from free, public-domain sources: Wikipedia/Wikidata and OpenStreetMap. Every claim the agent makes is cited under a strict five-field contract that is verified at generation time, so the narration cannot reference a place the agent did not actually retrieve.
 
-The bounded slice is by design: the corpus covers roughly 5km² around Morningside Heights and the Upper West Side, populated from Wikipedia, Wikidata, and the OSM Overpass API. Within that footprint the agent runs a single-tool retrieval loop with a hard 6-turn cap, a JSON terminal contract, and one corrective retry. The loop's narrowness is what makes the citation guarantees enforceable.
+The bounded slice is by design: the corpus covers Manhattan island (widened from Morningside Heights + UWS on 2026-05-12), populated from Wikipedia, Wikidata, and the OSM Overpass API. Within that footprint the agent runs a two-tool retrieval loop (`search_places` + `plan_walk`) with a hard 7-turn cap, a JSON terminal contract, and one corrective retry. The loop's narrowness is what makes the citation guarantees enforceable.
 
 ## Features
 
 The four properties below are enforced in code, not aspirational:
 
 - Plans short walking tours from a free, public-domain archive (Wikipedia/Wikidata + OpenStreetMap).
-- Single-tool agentic loop with a hard turn cap and a JSON terminal contract.
+- Two-tool agentic loop (`search_places` + `plan_walk`) with a hard 7-turn cap and a JSON terminal contract.
 - Every claim cited under a strict five-field contract, verified at generation time.
 - Server-streamed via SSE; the map renders the route with `flyTo` as citations arrive.
 - Structured food discovery flow: ask for coffee, lunch, or dessert nearby, compare candidates on the map, then choose one and continue the walk.
@@ -220,7 +220,7 @@ The SSE stream emits the following frames in order:
 The agent runs as a streamed multi-turn loop:
 
 1. **Question in.** The user question hits `/agent/ask` over SSE.
-2. **Search.** The agent dispatches `search_places` calls against a postgres+pgvector corpus, blending vector similarity (384-dim `bge-small`) with `pg_trgm` text search.
+2. **Search.** The agent dispatches `search_places` calls against a postgres+pgvector corpus. The retrieval pipeline is selectable via the `RETRIEVAL_MODE` env var: `dense` (384-dim `bge-small` cosine, the V1 default), `hybrid` (dense + `pg_trgm` name similarity fused via Reciprocal Rank Fusion, k=60), or `hybrid_reranked` (`hybrid` then top-N rescored by a `BAAI/bge-reranker-base` cross-encoder).
 3. **(Optional) Plan a walk.** For tour-style queries the agent calls `plan_walk` against an OSRM-backed routing service to convert cited place IDs into a street-following walking route with per-leg turn-by-turn instructions. A walk-intent classifier nudges the system prompt; the LLM still decides whether to call.
 4. **Terminate.** Within a hard cap of 7 turns the loop emits a JSON terminal response: `{narration, citations[]}` under a strict five-field contract (`doc_id`, `source_url`, `source_type`, `span`, `retrieval_turn`).
 5. **Verify.** A retrieval ledger checks every citation against documents actually returned in the conversation; one corrective retry on failure.
@@ -270,11 +270,17 @@ V1 ships the smallest end-to-end system that answers a citation-grounded walking
 - Monorepo + docker-compose
 - FastAPI skeleton + two-tier LLM router with circuit breakers
 - DB schema + embeddings (PostGIS + pgvector + pg_trgm; 384-dim)
-- Wikipedia + OSM ingestion (928 places, 323 documents)
+- Wikipedia + OSM ingestion (now 13,350 places, 456 wikipedia bodies, after Manhattan-wide widen on 2026-05-12)
 - Two-tool agent (`search_places`, `plan_walk`) + five-field citation verifier + OSRM-backed routing + walk-intent soft hint
 - SSE endpoint, frontend EventSource consumer, map markers + `flyTo`
 - Per-session telemetry harness for cost / cycle-time / failure-mode analysis
 - Docker images published to ghcr.io on every `main` push and on `v*` tags, pulled by `docker-compose.prod.yml`
+
+**V1.5, shipped on `worktree-eval-depth-and-corpus-expansion` (2026-05-12, tag `manhattan-100-eval-complete`):**
+
+- Manhattan-wide corpus expansion (SCOPE_BBOX widened, automatic re-ingest on `make nuke && make up`)
+- Selectable retrieval pipeline via `RETRIEVAL_MODE` env var (`dense` / `hybrid` / `hybrid_reranked`); BAAI/bge-reranker-base singleton loaded conditionally in the lifespan
+- Pre-registered 95-question Manhattan benchmark (tag `eval/manhattan-100-v1`); LLM-judge eval harness comparing palimpsest against vanilla-LLM and naive-RAG baselines. See `docs/eval/manhattan-100-results.md` for the ablation table and methodology caveats.
 
 **V2, planned:**
 
@@ -291,7 +297,8 @@ The deep-dives below are dated snapshots; each describes the system as of the da
 - [`docs/db-and-embeddings-2026-04-28.md`](docs/db-and-embeddings-2026-04-28.md): schema + ORM + embedder.
 - [`docs/ingestion-2026-04-28.md`](docs/ingestion-2026-04-28.md): Wikipedia + OSM ingestion.
 - [`docs/swap-llm-tiers-2026-04-28.md`](docs/swap-llm-tiers-2026-04-28.md): V1 MVP lock-down (LLM router rename, embedding model, citation contract, license).
-- [`openspec/changes/initial-palimpsest-scaffold/`](openspec/changes/initial-palimpsest-scaffold/): active OpenSpec change.
+- [`docs/eval/manhattan-100-results.md`](docs/eval/manhattan-100-results.md): 2026-05-12 ablation across 5 systems on the 95-question Manhattan bank, with v2 CCR rubric and methodology caveats.
+- [`openspec/changes/`](openspec/changes/): OpenSpec changes — `initial-palimpsest-scaffold` (V1), `eval-depth-and-corpus-expansion` (V1.5, complete), and the `swap-llm-tiers-and-lock-mvp-decisions` lock note.
 
 ## License
 

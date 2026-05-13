@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from sqlalchemy import bindparam, text
+from sqlalchemy import bindparam
 
 from app.agent.tools.base import Tool, ToolExecutionContext
 from app.db.models import SourceType
@@ -102,90 +102,23 @@ class _RetrieverProtocol(Protocol):
     ) -> list[SearchPlaceHit]: ...
 
 
-class PostgresRetriever:
-    """Hybrid retriever — cosine ANN over `places.embedding` + ST_DWithin."""
+# Imported here (after SearchPlaceHit + DEFAULT_RADIUS_M are defined) because
+# `app.retrieval.dense` imports those names back from this module. Module-level
+# import order:
+#   1. search_places defines SearchPlaceHit, DEFAULT_RADIUS_M
+#   2. search_places imports DenseRetriever from app.retrieval.dense
+#   3. dense.py imports SearchPlaceHit, DEFAULT_RADIUS_M from search_places (now present)
+#   4. PostgresRetriever is declared as a thin alias for back-compat.
+from app.retrieval.dense import DenseRetriever  # noqa: E402
 
-    async def search(  # noqa: PLR0913 — args mirror the tool's surface
-        self,
-        *,
-        session: Any,
-        embedder: Any,
-        query: str,
-        near: tuple[float, float] | None,
-        radius_m: int | None,
-        limit: int,
-    ) -> list[SearchPlaceHit]:
-        if embedder is None:
-            raise RuntimeError("embedder not available in execution context")
-        if session is None:
-            raise RuntimeError("db session not available in execution context")
 
-        query_vec = embedder.encode([query])[0]
-        # pgvector accepts the literal '[a,b,c,...]' string for a vector value.
-        vec_literal = "[" + ",".join(repr(float(x)) for x in query_vec) + "]"
+class PostgresRetriever(DenseRetriever):
+    """Back-compat alias for the dense pgvector retriever.
 
-        bind_params: dict[str, Any] = {
-            "qvec": vec_literal,
-            "limit": int(limit),
-        }
-        spatial_clause = ""
-        if near is not None:
-            lat, lon = near
-            spatial_clause = (
-                "AND ST_DWithin(geom, "
-                "ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, "
-                ":radius_m) "
-            )
-            bind_params["lat"] = float(lat)
-            bind_params["lon"] = float(lon)
-            bind_params["radius_m"] = int(radius_m or DEFAULT_RADIUS_M)
-
-        # cosine_distance = embedding <=> qvec (range 0..2; smaller = more similar)
-        # similarity score in [0, 1] = 1 - distance/2 (clamped)
-        sql = text(
-            f"""
-            SELECT
-                doc_id,
-                name,
-                source_type,
-                source_url,
-                ST_Y(geom::geometry) AS lat,
-                ST_X(geom::geometry) AS lon,
-                {(
-                    "ST_Distance(geom, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography)"
-                    if near is not None
-                    else "NULL"
-                )} AS distance_m,
-                (embedding <=> CAST(:qvec AS vector)) AS distance
-            FROM places
-            WHERE embedding IS NOT NULL
-              {spatial_clause}
-            ORDER BY embedding <=> CAST(:qvec AS vector)
-            LIMIT :limit
-            """
-        )
-        result = await session.execute(sql, bind_params)
-        hits: list[SearchPlaceHit] = []
-        for row in result.mappings():
-            distance = float(row["distance"])
-            score = max(0.0, min(1.0, 1.0 - distance / 2.0))
-            hits.append(
-                SearchPlaceHit(
-                    doc_id=row["doc_id"],
-                    name=row["name"],
-                    source_type=SourceType(row["source_type"]),
-                    source_url=row["source_url"],
-                    lat=float(row["lat"]),
-                    lon=float(row["lon"]),
-                    distance_m=(
-                        float(row["distance_m"])
-                        if row["distance_m"] is not None
-                        else None
-                    ),
-                    score=score,
-                )
-            )
-        return hits
+    Kept so existing import paths (`/internal/retrieve.py`, tests) still work
+    while new code targets `app.retrieval.dense.DenseRetriever` directly.
+    Behavior — SQL, score formula, SearchPlaceHit shape — is unchanged.
+    """
 
 
 # ── Tool ────────────────────────────────────────────────────────────
@@ -205,8 +138,18 @@ class SearchPlacesTool(Tool):
     )
     parameters = _PARAMETERS
 
-    def __init__(self, *, retriever: _RetrieverProtocol | None = None) -> None:
-        self._retriever = retriever or PostgresRetriever()
+    def __init__(
+        self,
+        *,
+        retriever: _RetrieverProtocol | None = None,
+        mode: str = "dense",
+        reranker: Any = None,
+    ) -> None:
+        if retriever is not None:
+            self._retriever = retriever
+        else:
+            from app.retrieval.factory import build_retriever
+            self._retriever = build_retriever(mode=mode, reranker=reranker)
 
     async def execute(
         self, args: dict[str, Any], context: ToolExecutionContext

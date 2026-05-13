@@ -1,0 +1,8 @@
+# Minimal pytest config for the host-side eval harness. We need
+# `asyncio_mode = "auto"` so async tests in `scripts/tests/` are collected
+# without per-test `@pytest.mark.asyncio` decorators (matches the canonical
+# style used in `apps/api/pyproject.toml`).
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["scripts/tests"]

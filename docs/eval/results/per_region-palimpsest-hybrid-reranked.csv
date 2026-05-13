@@ -1,0 +1,36 @@
+region,ccr_mean,hr_mean,fa_mean,nq_mean,grr_mean,n
+Chelsea,0.9444444444444445,0.75,0.5,3.8333333333333335,,3
+Financial District,1.0,0.5,1.4166666666666667,3.75,,2
+Financial District / Lower East Side,0.3333333333333333,1.0,,2.75,,1
+Financial District / unknown,0.5,0.75,0.0,3.75,,1
+Flatiron District,0.8571428571428571,1.0,0.8571428571428571,4.25,,1
+Greenwich Village,0.6746031746031745,0.5416666666666666,,3.5,,3
+Harlem,1.0,1.0,0.625,4.0,,3
+Hell's Kitchen,0.2,1.0,0.125,3.75,,1
+Inwood,1.0,0.3333333333333333,,4.25,,1
+Lower East Side,0.25,1.0,0.125,4.25,,1
+Lower East Side / unknown,1.0,0.75,0.5,2.75,,1
+Midtown,0.9,0.8,0.8571428571428571,3.3,,5
+Midtown / Harlem,1.0,1.0,,2.5,,1
+Midtown / Upper East Side,1.0,1.0,0.4,2.25,,1
+Midtown / Upper West Side,0.4,1.0,0.8,3.5,,1
+Morningside Heights,1.0,0.6666666666666667,0.5,3.5,,2
+Morningside Heights / unknown,0.6666666666666666,0.875,,3.75,,1
+SoHo,1.0,1.0,0.8571428571428571,4.0,,1
+SoHo / unknown,0.4444444444444444,0.9333333333333332,1.0,2.8333333333333335,,3
+Tribeca,0.875,1.0,0.0,3.5,,1
+Upper East Side,0.6111111111111112,1.0,0.3666666666666667,3.6666666666666665,,3
+Upper East Side / Midtown,1.0,1.0,0.4,3.25,,1
+Upper West Side,0.95,0.3125,4.375,3.75,,2
+Upper West Side / Upper East Side,0.4,0.625,0.2,3.75,,1
+Washington Heights,1.0,1.0,,4.0,,1
+Washington Heights / SoHo,0.5,0.8,0.0,3.75,,1
+outside_manhattan,,,,,0.2,10
+unknown,0.6866666666666668,0.7872222222222223,0.6055555555555555,3.6166666666666667,,15
+unknown / Chelsea,0.6,1.0,1.0,3.75,,1
+unknown / Harlem,0.5333333333333333,0.8333333333333333,2.0,3.5,,2
+unknown / Midtown,0.7333333333333334,1.0,0.4,3.0833333333333335,,3
+unknown / SoHo,0.4,1.0,,2.75,,1
+unknown / Upper East Side,1.0,0.9166666666666666,,3.0833333333333335,,3
+unknown / unknown,0.25,0.9,,2.625,,2
+varied,0.8466666666688888,0.6472222222222223,2.2575757575757573,3.716666666666667,,15

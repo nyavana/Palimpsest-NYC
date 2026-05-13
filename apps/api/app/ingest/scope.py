@@ -29,15 +29,19 @@ class ScopeBbox:
         return (self.min_lon, self.min_lat, self.max_lon, self.max_lat)
 
 
-# Morningside Heights + Upper West Side + adjacent Riverside / Central Park slivers.
-# Roughly: south of W 125th, north of W 59th, west of Central Park West (~-73.97),
-# east of Hudson (~-74.00). Slightly generous to catch edge places.
+# Manhattan island bbox (V2 — widening from MH+UWS to all of Manhattan).
+# Range chosen to enclose Inwood Hill in the north and Battery Park in the
+# south, with a small western buffer to catch waterfront landmarks and an
+# eastern buffer that stops short of Long Island City / Roosevelt Island.
 SCOPE_BBOX = ScopeBbox(
-    min_lat=40.7680,
-    max_lat=40.8150,
-    min_lon=-74.0050,
-    max_lon=-73.9550,
+    min_lat=40.7000,
+    max_lat=40.8800,
+    min_lon=-74.0200,
+    max_lon=-73.9100,
 )
+
+# Schema version for ingestion records. Bumped any time SCOPE_BBOX widens.
+SCOPE_VERSION = "v2-manhattan"
 
 # Historical window for Chronicling America and similar archives.
 HISTORICAL_START_YEAR = 1850
