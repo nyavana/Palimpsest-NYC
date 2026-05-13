@@ -89,7 +89,23 @@ Retrieval itself is pluggable. A \texttt{RetrievalMode} factory is selected at b
 Several later features build naturally on top of this architecture. The multi-turn session design serializes user and assistant history and sends it with each new request, allowing the loop to revise, shorten, or redirect prior answers. The map interaction layer maintains shared focus state between markers, citation cards, and the route timeline, so the same stop can be located from multiple interface surfaces. The food discovery feature adds a structured discovery endpoint that returns candidate dining places and then turns user selection into a follow-up routing request inside the existing session model.
 
 \section{Implementation and Data}
-The backend is implemented in Python 3.12 with FastAPI and async SQLAlchemy. The database layer uses PostgreSQL 16 with PostGIS for geometry, pgvector for embedding search, and trigram support for lexical matching. The ingestion pipeline populates the local corpus from two main sources. First, Wikipedia and Wikidata provide article content and provenance-bearing metadata for landmarks and institutions. Second, OpenStreetMap provides named points of interest, amenities, coordinates, and neighborhood-level urban structure. The food discovery extension widens the OSM ingest to include categories such as restaurants, cafes, fast-food venues, bars, pubs, bakeries, and ice-cream shops.
+The backend is implemented in Python 3.12 with FastAPI and async SQLAlchemy. The database layer uses PostgreSQL 16 with PostGIS for geometry, pgvector for embedding search, and trigram support for lexical matching. The ingestion pipeline populates the local corpus from OpenStreetMap (via the Overpass API) for named places, amenities, and coordinates, and from Wikipedia / Wikidata for longer-form historical context; the food discovery extension widens the OSM tag set to cover restaurants, cafes, bakeries, and similar venues.
+
+The corpus has since been widened from the original Morningside Heights / Upper West Side slice to all of Manhattan. Ingestion runs against the bounding box \((-74.02, 40.70, -73.91, 40.88)\) under \texttt{SCOPE\_VERSION = v2-manhattan} and, after de-duplication, yields \textbf{12{,}858} OSM places, \textbf{492} Wikipedia places, and \textbf{456} Wikipedia documents. The OSM side is a \(\mathbf{9.4\times}\) expansion over the V1 MH/UWS slice (1{,}363 places). The Wikipedia side is flat at 492 places because the Wikipedia ingest is API-capped at 500 items per batch; the cap appears to bind before the geographic filter does, so the 492 final count matching the V1 figure is best read as an artifact of the cap rather than a coincidence of geography, and lifting it is a v3 follow-up. Table~\ref{tab:corpus} reports the counts.
+
+\begin{table}[h]
+  \caption{Manhattan corpus counts after de-duplication at \texttt{SCOPE\_VERSION = v2-manhattan}.}
+  \label{tab:corpus}
+  \begin{tabular}{lr}
+    \toprule
+    Source & Count \\
+    \midrule
+    OSM places              & 12{,}858 \\
+    Wikipedia places        & 492 \\
+    Wikipedia documents     & 456 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
 Embeddings are produced with a 384-dimensional sentence-transformer model. That choice keeps inference light enough for the project scale while still supporting semantic retrieval over the place and document tables. Importantly, the database schema is migration-first: SQL migrations define the authoritative schema, and ORM models mirror that schema rather than creating it dynamically at runtime. This keeps the data layer predictable and reproducible.
 
