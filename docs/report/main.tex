@@ -113,31 +113,52 @@ The frontend is implemented with React, Vite, and TypeScript. Instead of treatin
 
 The LLM call path is built around two router tiers, \texttt{local} and \texttt{openrouter}, each protected by its own independent circuit breaker configured at \textbf{3 failures} inside a \textbf{60-second window} with a \textbf{30-second cooldown}. Bring-your-own-key (BYOK) requests carry credentials in an \texttt{X-LLM-Credentials} header; the backend reads that header per request and constructs a \emph{per-session} router with fresh breaker state and an isolated cache namespace, so a user-supplied bad key cannot trip the shared breaker or poison the shared LLM cache for other sessions. The same agent loop also exposes a \texttt{plan\_walk} tool that, in addition to producing the OSRM walking geometry between cited places, auto-discovers along-route POIs and surfaces them as candidate stops on the same route; this folds route-aware discovery into the existing two-tool surface rather than introducing a third tool, and the discovered stops flow through the same citation ledger as any other retrieved place.
 
-\section{Evaluation and Results}
-The evaluation goal for this project is not to claim state-of-the-art generation quality, but to show that the system works coherently end to end and that its grounding and interaction claims are supported by reproducible tests. We therefore evaluate Palimpsest NYC along three axes: grounded answer generation, route planning and visualization, and extended interactive workflows.
+\section{Evaluation and Results}\label{sec:evaluation}
+We evaluate Palimpsest against the pre-registered \texttt{manhattan-100} question bank (tagged \texttt{eval/manhattan-100-v1}). The bank contains 95 questions: 85 in-scope items spanning roughly twenty Manhattan neighborhood tags plus the \texttt{varied} and \texttt{unknown} buckets, and 10 out-of-scope controls (Brooklyn, Queens, Bronx, out-of-state, and fictional places) used to score refusal behavior. The bank was frozen before any of the five systems was run against it.
 
-For grounded generation, the critical result is that the final response is not accepted unless its citations are structurally valid and ledger-consistent. This is stronger than merely displaying references after generation. In practice, the system streams tool activity, retrieves candidate places, and only emits user-facing narration after the verifier accepts the citation set or returns a visible warning on retry exhaustion. For route planning, the system successfully converts cited places into walking geometry and turn-by-turn steps, which the frontend then renders as a route polyline with synchronized stops. For interaction quality, the later extensions demonstrate that the architecture remains compositional: multi-turn follow-ups, bidirectional map focus, and food selection all reuse the same session and routing infrastructure.
+Five systems are compared in a single ablation: \texttt{vanilla} (LLM with no retrieval), \texttt{naive\_rag} (top-$k$ retrieval concatenated into the prompt), \texttt{palimpsest-dense}, \texttt{palimpsest-hybrid}, and \texttt{palimpsest-hybrid-reranked}. All five are served by \texttt{openai/gpt-5.4-mini} through OpenRouter, so the model is held constant; the three Palimpsest variants differ only by the \texttt{RETRIEVAL\_MODE} boot flag and the reranker-enabled toggle.
 
-\begin{table*}[t]
-  \caption{Representative end-to-end test scenarios used to validate the final system.}
-  \label{tab:eval}
-  \begin{tabular}{p{0.18\linewidth} p{0.25\linewidth} p{0.38\linewidth} p{0.12\linewidth}}
+Five metrics are reported with 95\% bootstrap confidence intervals over 1000 resamples: CCR (citation-correctness rate), HR (hallucination rate, lower is better), FA (false-attribution count per response), NQ (narration quality on a 1--5 Likert), and GRR (grounded refusal rate on the out-of-scope subset, higher is better). The judge is \texttt{gpt-5.4-mini} served through OpenRouter; this is the same model class as the systems under evaluation, which is a self-grading risk we acknowledge and discuss in the methodology caveats. Total judge spend is approximately \$1.60 over roughly 1550 calls.
+
+\begin{table}[t]
+  \caption{Headline ablation on the pre-registered \texttt{manhattan-100} bank ($n=95$); mean [95\% bootstrap CI]. FA omitted (see prose).}
+  \label{tab:ablation}
+  \small
+  \begin{tabular}{l r l l l l}
     \toprule
-    Scenario & Example prompt & Expected behavior & Outcome \\
+    System & $n$ & CCR & HR $\downarrow$ & NQ & GRR $\uparrow$ \\
     \midrule
-    Grounded informational query & ``Tell me about Riverside Church'' & Retrieve relevant records, emit narration and verified citations, no unnecessary route. & Passed \\
-    Route planning query & ``Plan a walk from Columbia University to St. John the Divine'' & Call retrieval and routing tools, stream narration plus route geometry and ordered stops. & Passed \\
-    Multi-turn refinement & ``Tell me about Riverside Church'' $\rightarrow$ ``Make it shorter'' & Preserve session history and revise prior output instead of treating the second prompt as unrelated. & Passed \\
-    Map interaction consistency & Click citation, timeline stop, or marker & Synchronize focus across citation card, popup, route stop, and map viewport. & Passed \\
-    Food discovery flow & ``I want coffee near Columbia'' then choose a candidate & Return food candidates, show them on the map, then continue the walk to the selected venue. & Passed \\
-    Local-model backend swap & Route requests through an OpenAI-compatible LMDeploy endpoint & Preserve the same API and frontend behavior while changing the serving backend. & Passed \\
+    \texttt{vanilla} & 95 & 0.068 [0.024, 0.126] & 0.186 [0.136, 0.236] & 3.99 [3.89, 4.09] & 0.100 [0.000, 0.300] \\
+    \texttt{naive\_rag} & 95 & 0.856 [0.791, 0.914] & 0.313 [0.242, 0.388] & 3.41 [3.24, 3.59] & 0.700 [0.400, 1.000] \\
+    \texttt{palimpsest-dense} & 95 & 0.725 [0.648, 0.797] & 0.708 [0.621, 0.786] & 3.44 [3.29, 3.58] & 0.400 [0.100, 0.700] \\
+    \texttt{palimpsest-hybrid} & 95 & 0.751 [0.683, 0.815] & 0.620 [0.530, 0.717] & 3.45 [3.30, 3.59] & 0.500 [0.200, 0.800] \\
+    \texttt{palimpsest-hybrid-reranked} & 95 & 0.755 [0.678, 0.818] & 0.794 [0.722, 0.860] & 3.52 [3.39, 3.64] & 0.200 [0.000, 0.500] \\
     \bottomrule
   \end{tabular}
-\end{table*}
+\end{table}
 
-These scenarios show that the project satisfies the rubric's expectation of a complete and coherent system. The backend, data layer, and frontend are aligned: the same place records support retrieval, routing, citation verification, and UI rendering. The system also exposes interpretable internal structure. Because SSE frames are typed, debugging and demonstration are straightforward: a user can see whether the model searched, routed, cited, or failed, rather than observing only a final paragraph.
+Naive RAG posts the highest CCR in the table at 0.856, but this is a construction artifact rather than a quality claim. \texttt{naive\_rag} concatenates the entire top-$k$ retrieved set verbatim into the prompt, so any \texttt{doc\_id} the model cites is present in the retrieved set by construction; CCR collapses to ``did the model cite something from the block of text we just handed it.'' The three Palimpsest configurations instead invoke retrieval as agent tools across multiple turns and cite a smaller, targeted subset per turn, so their CCR is a stricter test of citation grounding. The meaningful comparison in the table is therefore among the Palimpsest variants.
 
-The current version also demonstrates useful breadth without sacrificing coherence. The new food workflow is not a bolt-on recommendation widget; it is integrated into the same map and session model as the rest of the application. Similarly, multi-turn support does not create a separate dialogue subsystem; it extends the existing agent request format with preserved history. This architectural reuse is an important result in its own right because it suggests the system can grow without becoming a collection of unrelated modules.
+Moving from \texttt{palimpsest-dense} to \texttt{palimpsest-hybrid} yields $+2.6\,\mathrm{pp}$ CCR (0.725 $\to$ 0.751) and $-8.8\,\mathrm{pp}$ HR (0.708 $\to$ 0.620). RRF fusion ($k=60$) of dense \texttt{bge-small} cosine scores with sparse \texttt{pg\_trgm} name similarity recovers proper-name lookups that pure dense embeddings miss. The two diagnostic cases we tracked through the run were Inwood Hill Park and the Lower East Side Tenement Museum: both are present in the corpus, but the dense embedding ranks similarly-named community gardens and other \texttt{tenement}-prefixed entries above them, and hybrid retrieval pulls the canonical record back to the top of the result set. FA also moves with this transition (hybrid FA $= 1.422$ vs dense FA $= 1.029$); the agent surfaces more candidates and occasionally over-attributes.
+
+The \texttt{palimpsest-hybrid} $\to$ \texttt{palimpsest-hybrid-reranked} move is the most unflattering line in the table, and we report it plainly. CCR rises by $+0.4\,\mathrm{pp}$ (0.751 $\to$ 0.755), well inside the bootstrap CI. HR regresses by $+17.4\,\mathrm{pp}$ (0.620 $\to$ 0.794), and GRR collapses from 0.500 to 0.200 on the 10 out-of-scope controls. FA does soften slightly (reranker FA $= 1.176$ vs hybrid FA $= 1.422$, so the reranker reduces over-attribution somewhat on the cases where it cites at all; vanilla FA $= 0.989$ is misleading because vanilla almost never cites). The takeaway we draw is that reranker tuning is an \emph{agent-prompt} concern, not just a retrieval-quality concern: when the cross-encoder surfaces more topically-relevant candidates, the agent treats them as license to make more claims, including on questions where it should refuse. The fix lives in the agent prompt that adjudicates which retrieved candidates make it into the citation set, not in the retriever stack.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{../eval/results/pareto.png}
+  \caption{Pareto frontier of CCR vs.\ p50 latency across the five systems. All systems share a Redis-backed prompt cache (\texttt{LLMCache}); plotted p50 latencies reflect warm-cache timing. Cold Palimpsest is approximately 2--4\,s per question over 2--4 tool turns. Because all three Palimpsest configurations serve the same cached prompts, the relative ordering between them remains meaningful.}
+  \label{fig:pareto}
+\end{figure}
+
+Five methodology caveats bound how strongly these numbers should be read:
+
+\begin{itemize}[leftmargin=*,itemsep=2pt,topsep=2pt]
+  \item \textbf{v2 CCR rubric.} OSM rows store name, URL, and coordinates but no prose, so \texttt{body\_excerpt} is empty by corpus design. The v2 rubric (\texttt{prompt\_version: v2}) accepts \texttt{doc\_id $\in$ retrieved\_docs} as sufficient grounding when the body is empty; v1 of the rubric scored every OSM citation to 0 and is no longer trustworthy for this corpus.
+  \item \textbf{Doc-ID harvesting.} \texttt{retrieved\_docs} is reconstructed from the terminal \texttt{citations} frame and from \texttt{walk.discovered\_stops[]}, not from a tool-result ledger: the V1 SSE schema only exposes \texttt{\{name, n\_hits\}} per tool call. This undercounts the HR denominator, because any retrieved-but-uncited document is invisible to the eval.
+  \item \textbf{LLMCache contamination.} All five systems share a Redis-backed prompt cache across the 95-question run. Correctness metrics (CCR/HR/FA/NQ/GRR) are unaffected, but latency and cost are deflated asymmetrically across systems and turn counts; the Pareto figure (Figure~\ref{fig:pareto}) should be read as warm-cache shape, not cold-start cost.
+  \item \textbf{Self-grading judge.} \texttt{gpt-5.4-mini} is both the system model and the judge model. This is a documented self-grading risk and is not mitigated by an independent grader in this run; an independent judge (e.g., \texttt{claude-opus-4-7}) would resolve it at $\sim$3--5$\times$ judge cost via a one-flag change to \texttt{judge\_run.py}.
+  \item \textbf{Inter-rater $\kappa$ deferred.} The \texttt{kappa} cell in the ablation table is \texttt{null}. Hand-grading the calibration worksheet at \texttt{docs/eval/grades/calibration.csv} and re-running \texttt{aggregate.py --hand-grades} recovers the number; we defer that step in this revision.
+\end{itemize}
 
 \section{Discussion, Limitations, and Insights}
 The main strength of Palimpsest NYC is that it treats grounding as a product requirement, not a cosmetic feature. The narrow tool surface and citation verifier create a development discipline: new capabilities must be made legible to the ledger and to the final response contract. This is partly why the system remains understandable even as new features are added.
