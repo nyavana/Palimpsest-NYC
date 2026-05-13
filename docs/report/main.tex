@@ -1,0 +1,165 @@
+\documentclass[sigconf,nonacm]{acmart}
+
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{hyperref}
+\usepackage{enumitem}
+
+\settopmatter{printacmref=false}
+\renewcommand\footnotetextcopyrightpermission[1]{}
+\pagestyle{plain}
+
+\title{Palimpsest NYC: A Citation-Grounded Agentic Walking-Tour System for Morningside Heights and the Upper West Side}
+
+% Replace the author block with your real name(s) and UNI(s) before submission.
+\author{Kaining Jia, kj2712}
+
+
+\begin{document}
+
+\begin{abstract}
+Palimpsest NYC is an agentic walking-tour system that answers place-based questions about a bounded region of New York City and turns them into citation-grounded narrations and optional walking routes. The system combines a FastAPI backend, a retrieval-augmented agent loop, PostgreSQL with PostGIS and pgvector, OpenStreetMap and Wikipedia-derived content, and a React plus MapLibre frontend that streams results over Server-Sent Events. The design goal is not only to generate fluent text, but also to guarantee that every user-facing claim is backed by a retrieved document. To enforce this property, the agent is constrained to a narrow two-tool surface, a strict terminal JSON schema, and a citation verifier that checks every cited document against a per-conversation retrieval ledger. Beyond the original walking-tour flow, the current version adds richer map interactions, true multi-turn session memory, and a food discovery workflow that lets users compare nearby cafes or restaurants on the map and then continue the route to a chosen destination. The resulting system is a coherent end-to-end application rather than a collection of disconnected components: it retrieves, reasons, cites, routes, streams, and visualizes within one unified user experience.
+\end{abstract}
+
+\maketitle
+
+\section{Introduction and Problem Formulation}
+Large language models are now strong enough to produce convincing urban narratives, but a city-guide application has a higher bar than general chat. It must connect generated text to real places, remain geographically bounded, and expose enough structure that a user can verify where claims come from. In a walking-tour setting, hallucinated locations or unsupported claims directly weaken trust. Palimpsest NYC addresses this problem by focusing on a narrow but realistic domain: short walking tours inside Morningside Heights and the Upper West Side, grounded in public-domain sources.
+
+The core project question is: \emph{can we build an end-to-end LLM application that produces useful, map-aware urban narration while enforcing citation correctness at generation time rather than treating grounding as a post-hoc add-on?} Our answer is a constrained agentic system in which retrieval, routing, and rendering are all first-class components. The backend retrieves candidate places and documents, the agent chooses whether to search or plan a route, a verifier checks the final citation set, and the frontend renders both the narration and the route as a synchronized experience.
+
+The current project version extends the base minimum viable product in three important ways. First, the map is no longer a passive visualization; citations, route stops, and markers now highlight one another bidirectionally. Second, the interface supports true multi-turn sessions, so follow-up instructions such as ``make it shorter'' or ``focus on churches'' operate on preserved history rather than starting a new request from scratch. Third, the system supports a structured food discovery flow, allowing a user to ask for coffee, lunch, or dessert nearby, inspect candidate places on the map, and continue the walk to a chosen stop. Together, these extensions move the project closer to a practical city companion while preserving the original grounding guarantees.
+
+\section{Related Work and Background}
+Palimpsest NYC sits at the intersection of retrieval-augmented generation, interactive map systems, and route planning. Retrieval-augmented generation (RAG) systems commonly improve factuality by providing documents to an LLM at answer time, but many still leave the final response weakly grounded: the model can mention items that were never actually retrieved, or it can cite loosely. Our design therefore emphasizes a \emph{verified citation contract}: every output citation must match a document that appeared in the active conversation ledger.
+
+On the spatial side, modern map applications often rely on a dedicated routing backend instead of asking the LLM to improvise paths. We follow that design through OSRM, which computes street-following walking routes and returns structured geometry and turn-by-turn steps. This separation of concerns is important: the LLM decides when a route is needed and which place IDs matter, while the graph-routing backend handles route optimization and path generation deterministically.
+
+The project also draws on public geographic and encyclopedic data. OpenStreetMap provides named places, amenities, and coordinates; Wikipedia and Wikidata provide richer historical context and source provenance. A bounded geography keeps the retrieval problem tractable and aligned with the project goal. Instead of solving open-world search, the system solves a much narrower question well: how to build a reliable, navigable narrative over a small but information-dense urban region.
+
+\section{System Design and Methodology}
+Palimpsest NYC follows a monorepo architecture with three application surfaces: a FastAPI backend, a minimal worker process, and a React frontend. The backend exposes the key interfaces, including a health endpoint, a general chat endpoint, and the streamed agent endpoint. The frontend is responsible for user interaction, map rendering, and progressive display of server events. The worker is intentionally lightweight in this version and leaves ingestion as an explicit command-line task.
+
+At the center of the system is an agent loop with a deliberately narrow contract. The loop exposes only two callable tools: \texttt{search\_places} for retrieval and \texttt{plan\_walk} for route construction. The agent operates under a hard turn cap and must terminate by emitting JSON with two top-level fields: \texttt{narration} and \texttt{citations}. Each citation must contain exactly five required fields: \texttt{doc\_id}, \texttt{source\_url}, \texttt{source\_type}, \texttt{span}, and \texttt{retrieval\_turn}. A verifier then checks this citation list against the per-session retrieval ledger. If verification fails, the loop allows one corrective retry; if the second attempt still fails, the system surfaces a warning instead of silently pretending success.
+
+This design constrains the model enough to make failure modes legible. The LLM can reason about content and route intent, but it cannot invent an arbitrary tool, skip the output schema, or cite an unseen record without being caught by the verifier. On the client side, the backend streams typed events over SSE, including tool calls, tool results, narration, citations, and route information. This makes the system easier to observe and easier to debug than a single opaque response.
+
+\begin{table}[t]
+  \caption{Core system components and responsibilities.}
+  \label{tab:components}
+  \begin{tabular}{p{0.2\linewidth} p{0.72\linewidth}}
+    \toprule
+    Component & Responsibility \\
+    \midrule
+    React + MapLibre frontend & Collect user queries, persist session state, stream SSE results, render citations, routes, and map interactions. \\
+    FastAPI agent backend & Run the LLM loop, dispatch tools, verify citations, frame SSE events, and expose the application API. \\
+    PostgreSQL + PostGIS + pgvector & Store places and documents, support semantic retrieval, spatial lookups, and provenance-preserving records. \\
+    \texttt{search\_places} tool & Retrieve relevant place and document candidates from the bounded corpus. \\
+    \texttt{plan\_walk} tool & Convert cited place IDs into street-following routes and step-by-step walking instructions via OSRM. \\
+    Citation verifier & Enforce the five-field citation contract against the retrieval ledger before a response reaches the user. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Several later features build naturally on top of this architecture. The multi-turn session design serializes user and assistant history and sends it with each new request, allowing the loop to revise, shorten, or redirect prior answers. The map interaction layer maintains shared focus state between markers, citation cards, and the route timeline, so the same stop can be located from multiple interface surfaces. The food discovery feature adds a structured discovery endpoint that returns candidate dining places and then turns user selection into a follow-up routing request inside the existing session model.
+
+\section{Implementation and Data}
+The backend is implemented in Python 3.12 with FastAPI and async SQLAlchemy. The database layer uses PostgreSQL 16 with PostGIS for geometry, pgvector for embedding search, and trigram support for lexical matching. The ingestion pipeline populates the local corpus from two main sources. First, Wikipedia and Wikidata provide article content and provenance-bearing metadata for landmarks and institutions. Second, OpenStreetMap provides named points of interest, amenities, coordinates, and neighborhood-level urban structure. The food discovery extension widens the OSM ingest to include categories such as restaurants, cafes, fast-food venues, bars, pubs, bakeries, and ice-cream shops.
+
+Embeddings are produced with a 384-dimensional sentence-transformer model. That choice keeps inference light enough for the project scale while still supporting semantic retrieval over the place and document tables. Importantly, the database schema is migration-first: SQL migrations define the authoritative schema, and ORM models mirror that schema rather than creating it dynamically at runtime. This keeps the data layer predictable and reproducible.
+
+The frontend is implemented with React, Vite, and TypeScript. Instead of treating the map as a static image pane, the interface integrates narration, citations, route stops, and place candidates into a shared interaction model. When a citation card is selected, the map can fly to the corresponding stop; when a marker is selected, the citation list and route timeline can reveal the same place. For food discovery, candidate markers appear before a route has been finalized, allowing the user to inspect alternatives visually before choosing a destination.
+
+The system also supports configurable LLM backends through an environment-driven router. In the original online deployment path, both routing tiers target OpenRouter-hosted models. The same interface can also point to any OpenAI-compatible backend, which we validated during development by connecting the project to a remote LMDeploy-hosted Qwen2.5-14B-Instruct endpoint without changing the frontend protocol. This separation keeps model hosting concerns decoupled from the agent and UI contracts.
+
+\section{Evaluation and Results}
+The evaluation goal for this project is not to claim state-of-the-art generation quality, but to show that the system works coherently end to end and that its grounding and interaction claims are supported by reproducible tests. We therefore evaluate Palimpsest NYC along three axes: grounded answer generation, route planning and visualization, and extended interactive workflows.
+
+For grounded generation, the critical result is that the final response is not accepted unless its citations are structurally valid and ledger-consistent. This is stronger than merely displaying references after generation. In practice, the system streams tool activity, retrieves candidate places, and only emits user-facing narration after the verifier accepts the citation set or returns a visible warning on retry exhaustion. For route planning, the system successfully converts cited places into walking geometry and turn-by-turn steps, which the frontend then renders as a route polyline with synchronized stops. For interaction quality, the later extensions demonstrate that the architecture remains compositional: multi-turn follow-ups, bidirectional map focus, and food selection all reuse the same session and routing infrastructure.
+
+\begin{table*}[t]
+  \caption{Representative end-to-end test scenarios used to validate the final system.}
+  \label{tab:eval}
+  \begin{tabular}{p{0.18\linewidth} p{0.25\linewidth} p{0.38\linewidth} p{0.12\linewidth}}
+    \toprule
+    Scenario & Example prompt & Expected behavior & Outcome \\
+    \midrule
+    Grounded informational query & ``Tell me about Riverside Church'' & Retrieve relevant records, emit narration and verified citations, no unnecessary route. & Passed \\
+    Route planning query & ``Plan a walk from Columbia University to St. John the Divine'' & Call retrieval and routing tools, stream narration plus route geometry and ordered stops. & Passed \\
+    Multi-turn refinement & ``Tell me about Riverside Church'' $\rightarrow$ ``Make it shorter'' & Preserve session history and revise prior output instead of treating the second prompt as unrelated. & Passed \\
+    Map interaction consistency & Click citation, timeline stop, or marker & Synchronize focus across citation card, popup, route stop, and map viewport. & Passed \\
+    Food discovery flow & ``I want coffee near Columbia'' then choose a candidate & Return food candidates, show them on the map, then continue the walk to the selected venue. & Passed \\
+    Local-model backend swap & Route requests through an OpenAI-compatible LMDeploy endpoint & Preserve the same API and frontend behavior while changing the serving backend. & Passed \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+These scenarios show that the project satisfies the rubric's expectation of a complete and coherent system. The backend, data layer, and frontend are aligned: the same place records support retrieval, routing, citation verification, and UI rendering. The system also exposes interpretable internal structure. Because SSE frames are typed, debugging and demonstration are straightforward: a user can see whether the model searched, routed, cited, or failed, rather than observing only a final paragraph.
+
+The current version also demonstrates useful breadth without sacrificing coherence. The new food workflow is not a bolt-on recommendation widget; it is integrated into the same map and session model as the rest of the application. Similarly, multi-turn support does not create a separate dialogue subsystem; it extends the existing agent request format with preserved history. This architectural reuse is an important result in its own right because it suggests the system can grow without becoming a collection of unrelated modules.
+
+\section{Discussion, Limitations, and Insights}
+The main strength of Palimpsest NYC is that it treats grounding as a product requirement, not a cosmetic feature. The narrow tool surface and citation verifier create a development discipline: new capabilities must be made legible to the ledger and to the final response contract. This is partly why the system remains understandable even as new features are added.
+
+At the same time, the project has clear limitations. Its geographic scope is intentionally narrow, and the data quality is tied to public-source coverage inside that bounded region. The food discovery workflow is useful, but its recommendation quality is still limited by OpenStreetMap tags and does not yet include live business metadata such as ratings, hours, or occupancy. The evaluation is primarily system-level and functional rather than a formal user study. Finally, while the LLM backend is swappable, the strongest reliability still comes from the surrounding system design rather than from the model alone.
+
+An important practical insight from the project is that good agent applications often come from reducing freedom rather than increasing it. By restricting the tool surface, locking the citation schema, and pushing route computation into deterministic infrastructure, the overall system becomes easier to evaluate, explain, and extend. The later additions -- richer map interaction, multi-turn memory, and place selection flows -- worked well precisely because the original core was narrow and well specified.
+
+\section{Conclusion}
+Palimpsest NYC demonstrates that an LLM-based city-guide application can be both interactive and structured. The project combines retrieval, routing, citation verification, and map-based visualization into one end-to-end workflow for a bounded urban region. Its main technical contribution is not just the use of an LLM, but the way the surrounding system constrains and validates that model. The final result is a working agentic application that produces citation-grounded narration, route-aware map experiences, multi-turn refinements, and structured place discovery while preserving a coherent architecture across backend, database, and frontend layers.
+
+\section*{Project Links}
+\noindent\textbf{GitHub repository:} \url{https://github.com/DANNNNNJUAN/Palimpsest-NYC_PRO}
+
+\noindent\textbf{Demo video:} \url{https://INSERT-DEMO-VIDEO-LINK-HERE}
+
+\begin{thebibliography}{9}
+
+\bibitem{fastapi}
+Sebastian Ramirez.
+\newblock FastAPI.
+\newblock \url{https://fastapi.tiangolo.com/}
+
+\bibitem{maplibre}
+MapLibre Contributors.
+\newblock MapLibre GL JS.
+\newblock \url{https://maplibre.org/}
+
+\bibitem{osrm}
+Project OSRM.
+\newblock Open Source Routing Machine.
+\newblock \url{https://project-osrm.org/}
+
+\bibitem{osm}
+OpenStreetMap Contributors.
+\newblock OpenStreetMap.
+\newblock \url{https://www.openstreetmap.org/}
+
+\bibitem{wikipedia}
+Wikimedia Foundation.
+\newblock Wikipedia.
+\newblock \url{https://www.wikipedia.org/}
+
+\bibitem{postgres}
+The PostgreSQL Global Development Group.
+\newblock PostgreSQL.
+\newblock \url{https://www.postgresql.org/}
+
+\bibitem{pgvector}
+pgvector Contributors.
+\newblock pgvector.
+\newblock \url{https://github.com/pgvector/pgvector}
+
+\bibitem{openrouter}
+OpenRouter.
+\newblock OpenRouter API.
+\newblock \url{https://openrouter.ai/}
+
+\bibitem{acm}
+Association for Computing Machinery.
+\newblock ACM article template.
+\newblock \url{https://www.overleaf.com/latex/templates/association-for-computing-machinery-acm-sigplan-proceedings-template/rfvsrhgmghtc}
+
+\end{thebibliography}
+
+\end{document}
