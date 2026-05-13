@@ -66,6 +66,8 @@ At the center of the system is an agent loop with a deliberately narrow contract
 
 This design constrains the model enough to make failure modes legible. The LLM can reason about content and route intent, but it cannot invent an arbitrary tool, skip the output schema, or cite an unseen record without being caught by the verifier. On the client side, the backend streams typed events over SSE, including tool calls, tool results, narration, citations, and route information. This makes the system easier to observe and easier to debug than a single opaque response.
 
+Retrieval itself is pluggable. A \texttt{RetrievalMode} factory is selected at boot from the \texttt{RETRIEVAL\_MODE} environment flag and exposes three implementations. The \emph{dense} mode runs a pgvector cosine search over 384-dim \texttt{BAAI/bge-small-en-v1.5} embeddings indexed with ivfflat (\texttt{lists=100})~\cite{bge}. The \emph{hybrid} mode adds a sparse branch over \texttt{pg\_trgm} name similarity~\cite{pgtrgm} and fuses the two rankings with Reciprocal Rank Fusion at \(k=60\)~\cite{rrf}. The \emph{hybrid-reranked} mode keeps the same fusion step and then re-scores the top-\(k\) union with a BGE-reranker-base cross-encoder~\cite{bgereranker}. All three modes return the same \texttt{SearchPlaceHit} tool-result shape, so the agent loop is mode-agnostic: swapping modes changes ranking quality but not the tool contract, the citation ledger, or the verifier path.
+
 \begin{table}[t]
   \caption{Core system components and responsibilities.}
   \label{tab:components}
@@ -79,6 +81,7 @@ This design constrains the model enough to make failure modes legible. The LLM c
     \texttt{search\_places} tool & Retrieve relevant place and document candidates from the bounded corpus. \\
     \texttt{plan\_walk} tool & Convert cited place IDs into street-following routes and step-by-step walking instructions via OSRM. \\
     Citation verifier & Enforce the five-field citation contract against the retrieval ledger before a response reaches the user. \\
+    Retrieval factory & Boot-time selection of dense / hybrid / hybrid-reranked retrieval modes via the \texttt{RETRIEVAL\_MODE} env flag; preserves the \texttt{SearchPlaceHit} tool-result shape so the agent loop is mode-agnostic. \\
     \bottomrule
   \end{tabular}
 \end{table}
