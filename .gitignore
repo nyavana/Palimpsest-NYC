@@ -86,3 +86,12 @@ Thumbs.db
 *.bin
 *.safetensors
 models/
+
+# ───────────────────────────── Local-only docs / workflow ──────────────
+# Agent-facing instructions and internal planning materials are kept
+# local; they are not part of the published repo.
+CLAUDE.md
+AGENTS.md
+/openspec
+/docs/superpowers
+
