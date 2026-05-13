@@ -19,6 +19,7 @@ from app.agent.tools.base import Tool, ToolExecutionContext, ToolRegistry
 from app.llm.models import (
     ChatRequest,
     ChatResponse,
+    Message,
     ToolCall,
     Usage,
 )

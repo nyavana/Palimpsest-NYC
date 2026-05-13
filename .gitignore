@@ -92,6 +92,8 @@ models/
 # local; they are not part of the published repo.
 CLAUDE.md
 AGENTS.md
+.agents
+.claude
 /openspec
 /docs/superpowers
 
