@@ -1,305 +1,135 @@
 # Palimpsest NYC
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Docker images](https://img.shields.io/badge/ghcr.io-nyavana%2Fpalimpsest-blue?logo=docker)](https://github.com/nyavana/Palimpsest-NYC/pkgs/container/palimpsest-api)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
+[![Live demo](https://img.shields.io/badge/demo-online-brightgreen)](https://palimpsest-demo.nyavana.io/)
 
-> An agentic LLM walking tour of Morningside Heights & the Upper West Side, grounded in public-domain archives, rendered in 3D.
+> **Agentic walking tours of Manhattan, narrated from open data, with every claim cited.**
 
-![Palimpsest NYC web UI](docs/assets/Screenshot_28-4-2026_2088_localhost.jpeg)
+![Palimpsest NYC](docs/assets/intro.png)
 
-*The "Ask Palimpsest" panel on the right streams a citation-grounded narration over Server-Sent Events while the map flies between cited places on the left.*
+Palimpsest plans a short walking tour of Manhattan and narrates it from free, public-domain sources — Wikipedia, Wikidata, and OpenStreetMap. Every claim is grounded in retrieved documents under a strict five-field citation contract that the system verifies before streaming the response, so the narration cannot reference a place the agent did not actually retrieve.
 
-Palimpsest plans a short walking tour for a bounded slice of NYC and narrates it from free, public-domain sources: Wikipedia/Wikidata and OpenStreetMap. Every claim the agent makes is cited under a strict five-field contract that is verified at generation time, so the narration cannot reference a place the agent did not actually retrieve.
+## Links
 
-The bounded slice is by design: the corpus covers Manhattan island (widened from Morningside Heights + UWS on 2026-05-12), populated from Wikipedia, Wikidata, and the OSM Overpass API. Within that footprint the agent runs a two-tool retrieval loop (`search_places` + `plan_walk`) with a hard 7-turn cap, a JSON terminal contract, and one corrective retry. The loop's narrowness is what makes the citation guarantees enforceable.
+- 🌐 **Project site** — <https://palimpsest-nyc.nyavana.io/>
+- 🎮 **Live demo** — <https://palimpsest-demo.nyavana.io/>
+- 📦 **Container images** — `ghcr.io/nyavana/palimpsest-{api,web,postgres}`
+- 📄 **License** — [MIT](LICENSE)
 
 ## Features
 
-The four properties below are enforced in code, not aspirational:
+- **Citation-grounded walking tours.** Every fact in the narration is tied to a retrieved document under a strict five-field contract (`doc_id`, `source_url`, `source_type`, `span`, `retrieval_turn`), checked against a retrieval ledger before the response leaves the server.
+- **Manhattan-wide POI corpus.** ~13,350 places — 12,858 OpenStreetMap features and 492 Wikipedia/Wikidata entries — ingested, embedded, and queryable out of the box.
+- **Hybrid retrieval.** Switch between dense (`bge-small`, 384-dim), hybrid (dense + `pg_trgm` name similarity fused with RRF), and hybrid + cross-encoder reranker (`bge-reranker-base`) modes via a single env var.
+- **Two-tool agent loop.** A bounded loop (hard 6-turn cap, JSON terminal contract) where the LLM picks between `search_places` (retrieval) and `plan_walk` (OSRM-backed routing + along-route POI discovery).
+- **Server-sent streaming.** SSE frames for turn, tool-call, tool-result, narration, citations, and the routed walk — the map flies between places as the response unfolds.
+- **Food discovery side flow.** Ask for coffee, lunch, or dessert nearby; get a structured candidate list with hybrid lexical + vector ranking, choose one, and continue the tour.
+- **Bring your own key.** Leave the operator key blank and visitors authenticate with their own OpenRouter (or any OpenAI-compatible) credentials via the in-app Settings panel — held only in browser `sessionStorage`.
 
-- Plans short walking tours from a free, public-domain archive (Wikipedia/Wikidata + OpenStreetMap).
-- Two-tool agentic loop (`search_places` + `plan_walk`) with a hard 7-turn cap and a JSON terminal contract.
-- Every claim cited under a strict five-field contract, verified at generation time.
-- Server-streamed via SSE; the map renders the route with `flyTo` as citations arrive.
-- Structured food discovery flow: ask for coffee, lunch, or dessert nearby, compare candidates on the map, then choose one and continue the walk.
+## Architecture
 
-For the new "find food, choose a place, then route there" flow, see [docs/food-discovery/README.md](docs/food-discovery/README.md).
+![Architecture](docs/assets/architecture.png)
 
-## Quickstart
+A user's question hits the FastAPI backend over SSE and enters a bounded agent loop. Each turn the LLM chooses between `search_places` (hybrid retrieval over PostGIS + pgvector + pg_trgm, optionally reranked) and `plan_walk` (an OSRM foot-profile router that auto-discovers POIs along the route). The loop terminates with a JSON payload of narration text and verified citations; the React frontend streams the narration, draws the route as a polyline, and triggers MapLibre `flyTo` as citations arrive on the wire.
 
-This runs the full project on your machine using the prebuilt Docker images. Nothing on your host except Docker itself.
+**Stack:**
 
-Docker bundles each service and its dependencies into an image. The compose file in this repo describes five such services (postgres, redis, api, worker, web) and the network they share, and brings them all up with one command.
+- **Backend** — FastAPI · Python 3.12 · async SQLAlchemy + asyncpg
+- **Data** — PostgreSQL 16 + PostGIS + pgvector + pg_trgm · Redis · OSRM (foot profile)
+- **LLM** — OpenRouter behind a two-tier router with per-tier circuit breakers
+- **Embeddings** — `BAAI/bge-small-en-v1.5` (384-dim, CPU)
+- **Reranker (optional)** — `BAAI/bge-reranker-base` cross-encoder
+- **Frontend** — React · Vite · TypeScript · MapLibre GL · Tailwind
 
-### Prerequisites
+## Results
 
-- **Docker** with the `compose` v2 plugin. On macOS or Windows, install [Docker Desktop](https://www.docker.com/products/docker-desktop/). On Linux, install [Docker Engine](https://docs.docker.com/engine/install/) and confirm `docker compose version` works.
-- **An OpenRouter API key** from [openrouter.ai/keys](https://openrouter.ai/keys). The default models the project uses are on the free tier.
-- About **2 GB of free disk** for the images and the corpus.
+![Results](docs/assets/results.png)
 
-### 1. Get the deployment files
+Evaluated on **Manhattan-100**, a pre-registered benchmark of 95 graded questions (tag `eval/manhattan-100-v1`), judged by an LLM rubric (Citation-Correct Rate, Hallucination Rate, Numerical Quality, Graceful Refusal Rate).
 
-You need the repo's `docker-compose.prod.yml` and `.env.example`. Cloning is the simplest way:
+| System | Citation-Correct Rate (CCR) |
+|---|---:|
+| Vanilla LLM, no retrieval | **6.8%** |
+| Palimpsest — dense retrieval | 72.5% |
+| Palimpsest — hybrid retrieval | 75.1% |
+| **Palimpsest — hybrid + reranker** | **75.5%** |
+| Naive RAG (top-k dump into prompt) | 85.6% † |
+
+† Naive RAG looks higher because it dumps the entire top-k retrieval into the prompt, so almost every cited `doc_id` is present in `retrieved_docs` by construction; Palimpsest's agent calls retrieval as a tool and cites a smaller, more targeted set per turn.
+
+Full ablation, per-region / per-source breakdowns, accuracy-vs-latency Pareto, and methodology caveats: [`docs/eval/manhattan-100-results.md`](docs/eval/manhattan-100-results.md).
+
+## Getting started
+
+Run the full stack from the published images in four commands. Requires Docker with the `compose` v2 plugin and ~2 GB of free disk.
 
 ```bash
 git clone https://github.com/nyavana/Palimpsest-NYC.git
 cd Palimpsest-NYC
-```
-
-If you'd rather not clone, download just those two files from the repo into a fresh directory.
-
-### 2. Set your API key
-
-```bash
-cp .env.example .env
-# open .env in any editor and set OPENROUTER_API_KEY=sk-or-v1-...
-```
-
-`.env` stays on your machine; it never enters the Docker images. On a shared host, run `chmod 600 .env` so only your user can read it.
-
-### 3. Pull the images
-
-```bash
-docker compose -f docker-compose.prod.yml pull
-```
-
-This downloads three Palimpsest images (`api`, `web`, `postgres`) from `ghcr.io/nyavana/palimpsest-*` plus the public `redis:7-alpine` image. About 1 GB total. The first pull takes a couple of minutes; later pulls only fetch the layers that changed.
-
-### 4. Start everything
-
-```bash
+cp .env.example .env                                # set OPENROUTER_API_KEY, or leave blank for BYOK
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-`-d` runs the stack detached (in the background). Compose starts services in dependency order: postgres and redis become healthy first, then api and worker, then web. The first start downloads the `BAAI/bge-small-en-v1.5` embedding model (~130 MB) into a named volume, which adds about a minute one time.
+Then open <http://localhost:5173>.
 
-### 5. Verify it's up
-
-```bash
-docker compose -f docker-compose.prod.yml ps
-```
-
-Every service should report `Up` and `(healthy)`. Then:
-
-```bash
-curl http://localhost:8000/health
-# {"status":"ok","version":"0.1.0"}
-```
-
-Open [http://localhost:5173](http://localhost:5173) in a browser. The UI loads, but the agent has nothing to talk about until you populate the corpus.
-
-### 6. Populate the corpus (one-time, ~30 seconds)
+The first start downloads the `bge-small-en-v1.5` embedding weights (~130 MB) into a named volume; subsequent starts skip this. After the stack is healthy, populate the corpus once:
 
 ```bash
 docker compose -f docker-compose.prod.yml exec api python -m app.ingest.cli osm run
 docker compose -f docker-compose.prod.yml exec api python -m app.ingest.cli wikipedia run
 ```
 
-`docker compose ... exec api ...` runs a command inside the already-running api container. Both ingestors are idempotent — re-running them won't create duplicates. After this you should have 928 places and 323 documents in postgres, all embedded.
+For environment variables, image pinning (`PALIMPSEST_TAG=v0.1.0`), building from source, day-to-day operations, and troubleshooting, see [**docs/deployment.md**](docs/deployment.md).
 
-You're done. Ask the agent something through the web UI, or skip ahead to [Try the agent](#try-the-agent) for a `curl` example and the SSE event format.
+## API at a glance
 
-## Day-to-day operations
-
-All commands run from the repo root with the same `-f docker-compose.prod.yml` flag.
-
-**Tail logs.** Live, last 100 lines, all services:
+Stream a walking-tour answer over SSE:
 
 ```bash
-docker compose -f docker-compose.prod.yml logs -f --tail 100
+curl -N -X POST -H "Content-Type: application/json" \
+  -d '{"q":"Tell me about a gothic cathedral in Morningside Heights"}' \
+  http://localhost:8000/agent/ask
 ```
 
-For a single service add the name: `... logs -f api`.
+The response is an SSE stream of `turn → tool_call → tool_result → narration → citations → [walk?] → done` frames.
 
-**Stop without losing data.**
+In BYOK mode (operator key blank), pass the user's credentials in the `X-LLM-Credentials` header as base64-encoded JSON:
 
 ```bash
-docker compose -f docker-compose.prod.yml down
+HEADER=$(printf '%s' '{"api_key":"sk-or-v1-...","model":"openai/gpt-5.4-mini"}' | base64 -w0)
+curl -N -X POST -H "Content-Type: application/json" -H "X-LLM-Credentials: $HEADER" \
+  -d '{"q":"..."}' http://localhost:8000/agent/ask
 ```
 
-The corpus, embeddings cache, and redis state live in named volumes (`palimpsest-postgres-data`, `palimpsest-hf-cache`, `palimpsest-redis-data`). Bring everything back with `up -d`.
-
-**Update to a newer release.**
+Food discovery (structured candidate list, not the streaming agent):
 
 ```bash
-git pull
-docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"q":"coffee near Columbia"}' \
+  http://localhost:8000/food/discover
 ```
 
-`up -d` recreates only the containers whose images changed.
+## Documentation
 
-**Pin a specific version.** The default tag is `latest` (tracks `main`). For a deployment you want to be reproducible, pin to a semver tag:
+- [Deployment guide](docs/deployment.md) — env vars, image pinning, build from source, operations, troubleshooting
+- [Project overview](docs/project-overview.md) — architecture, design decisions, data sources
+- [Evaluation results](docs/eval/manhattan-100-results.md) — Manhattan-100 ablation and methodology
+- [Food discovery flow](docs/food-discovery/README.md) — design rationale and chat-pane intent routing
+- [Legacy README](docs/README-legacy.md) — the original research-flavored README, preserved verbatim
 
-```bash
-PALIMPSEST_TAG=v0.1.0 docker compose -f docker-compose.prod.yml pull
-PALIMPSEST_TAG=v0.1.0 docker compose -f docker-compose.prod.yml up -d
-```
+## Acknowledgements
 
-Tag the variable in your shell or `.env` so every command picks it up.
+Built on open data and open models:
 
-**Open a shell inside a container.**
-
-```bash
-docker compose -f docker-compose.prod.yml exec api bash
-docker compose -f docker-compose.prod.yml exec postgres psql -U palimpsest -d palimpsest
-```
-
-**Wipe everything (drops the corpus too).**
-
-```bash
-docker compose -f docker-compose.prod.yml down -v
-```
-
-You will need to re-run the ingestion CLIs after this.
-
-## What's in the published images
-
-| Image | Purpose |
-|---|---|
-| `ghcr.io/nyavana/palimpsest-api` | FastAPI backend, agent loop, ingestion CLI. The worker reuses this image with a different command. |
-| `ghcr.io/nyavana/palimpsest-web` | React SPA built into nginx. Routes `/api/*` to the api service over the compose network. |
-| `ghcr.io/nyavana/palimpsest-postgres` | PostGIS 16 + pgvector + pg_trgm, with the V1 migrations baked into `/docker-entrypoint-initdb.d`. |
-
-Tags: `latest` tracks `main`; semver tags (`v0.1.0`, `0.1`) come from git tags. The api image is around 760 MB uncompressed — `torch` is pulled from the CPU-only PyTorch index, so none of the CUDA payload is along for the ride.
-
-The OpenRouter key is read from your host's `.env` at container start; it never enters the image. The published images have been audited for `.env` files and OpenRouter key signatures and are clean.
-
-> **Note on routing.** `docker-compose.prod.yml` does not currently include the `osrm` / `osrm-prepare` services, so published-image deployments fall back to haversine straight-line walks (the `plan_walk` tool returns `routing_backend="haversine_fallback"`). To get street-following routes in a deployed environment, add the OSRM services or build from source — see [`infra/osrm/README.md`](infra/osrm/README.md). Wiring OSRM into the prod compose is a tracked V2 item.
-
-## Build from source
-
-If you want to develop against the project rather than just run it, build the stack locally with `make up`. This needs Docker plus `uv` (or Python 3.12 + `venv`) and Node 20+ on the host.
-
-```bash
-cp .env.example .env
-make up        # build and start
-make logs      # tail container logs
-curl http://localhost:8000/health
-open http://localhost:5173
-```
-
-Stop with `make down`, or `make nuke` to drop the volumes too. Schema changes require `make nuke && make up`, because the schema is owned by `apps/api/app/db/migrations/*.sql` and is applied by the postgres entrypoint on first volume init. ORM `create_all` is never used in app code paths.
-
-### Routing graph (OSRM)
-
-The agent's `plan_walk` tool calls an in-network OSRM service for street-following walking routes. Two compose services back this:
-
-- **`osrm-prepare`** — one-shot. On first start it runs `osrm-extract -p foot.lua && osrm-partition && osrm-customize` against the OSM extract at `infra/osrm/extract.osm.pbf` and writes the prepared graph to a named volume. Idempotent: skips on subsequent boots once `extract.osrm.cnbg` is present.
-- **`osrm`** — runtime. Serves `http://osrm:5000` on the compose network using `osrm-routed --algorithm mld` against the prepared graph. The image is pinned to `osrm/osrm-backend:v5.25.0`.
-
-The OSM extract is **not committed** (it's ~100 MB and changes upstream). On a fresh checkout you need to drop a `.osm.pbf` for the V1 bbox at `infra/osrm/extract.osm.pbf` before `make up`. The full refresh procedure (BBBike URL, Geofabrik clip with `osmium`, idempotency rules, expected file sizes, smoke test) is in [`infra/osrm/README.md`](infra/osrm/README.md).
-
-If `osrm` is unreachable at request time, `plan_walk` falls back to a haversine straight-line route with `routing_backend="haversine_fallback"` rather than failing the request — the frontend renders this as a dashed muted path.
-
-## Try the agent
-
-With the stack up and the corpus populated (Quickstart step 6), ask the agent a walking-tour question over SSE:
-
-```bash
-curl -N "http://localhost:8000/agent/ask?q=Tell+me+about+a+gothic+cathedral+in+Morningside+Heights"
-```
-
-If you built from source, the same URL works (the dev compose exposes the api on port 8000 too).
-
-The SSE stream emits the following frames in order:
-
-| event | when |
-|---|---|
-| `turn` | each LLM turn boundary |
-| `tool_call` | the agent invokes `search_places` or `plan_walk` |
-| `tool_result` | matched documents (or a routed walk) come back |
-| `tool_error` | a tool invocation raised; the loop continues with the error fed back to the LLM |
-| `narration` | terminal JSON payload with the prose |
-| `citations` | terminal JSON payload with the cited documents |
-| `warning` | non-fatal verifier warning (e.g. citation retry exhausted with `verified=False`) |
-| `walk` | emitted only when the agent called `plan_walk` (street-following GeoJSON LineString + per-leg turn-by-turn) |
-| `done` | terminal marker |
-
-## How it works
-
-The agent runs as a streamed multi-turn loop:
-
-1. **Question in.** The user question hits `/agent/ask` over SSE.
-2. **Search.** The agent dispatches `search_places` calls against a postgres+pgvector corpus. The retrieval pipeline is selectable via the `RETRIEVAL_MODE` env var: `dense` (384-dim `bge-small` cosine, the V1 default), `hybrid` (dense + `pg_trgm` name similarity fused via Reciprocal Rank Fusion, k=60), or `hybrid_reranked` (`hybrid` then top-N rescored by a `BAAI/bge-reranker-base` cross-encoder).
-3. **(Optional) Plan a walk.** For tour-style queries the agent calls `plan_walk` against an OSRM-backed routing service to convert cited place IDs into a street-following walking route with per-leg turn-by-turn instructions. A walk-intent classifier nudges the system prompt; the LLM still decides whether to call.
-4. **Terminate.** Within a hard cap of 7 turns the loop emits a JSON terminal response: `{narration, citations[]}` under a strict five-field contract (`doc_id`, `source_url`, `source_type`, `span`, `retrieval_turn`).
-5. **Verify.** A retrieval ledger checks every citation against documents actually returned in the conversation; one corrective retry on failure.
-6. **Stream to client.** Each stage emits an SSE frame; the React client renders narration, triggers `flyTo` as citations arrive, and draws the OSRM walk geometry as a polyline if the agent produced one.
-
-The loop is intentionally narrow: two tools, one terminal response shape, and no branching once citations are verified. That keeps each invariant easy to test in isolation and easy to reason about when something fails.
-
-For the architecture diagram and the agent loop deep-dive, see [`docs/project-overview.md`](docs/project-overview.md), [`docs/agent-2026-04-28.md`](docs/agent-2026-04-28.md), and [`docs/route-planning-2026-05-04.md`](docs/route-planning-2026-05-04.md).
-
-For the structured food-pick workflow and its implementation notes, see [`docs/food-discovery/README.md`](docs/food-discovery/README.md).
-
-## Tech stack
-
-The stack splits into four layers; each was chosen so v2 can swap one piece without touching the others:
-
-- **Backend:** FastAPI · Python 3.12 · async SQLAlchemy + asyncpg · PostgreSQL 16 + PostGIS + pgvector + pg_trgm · Redis · OSRM (foot profile) for street-following walking routes.
-- **Frontend:** React + Vite + TypeScript · MapLibre GL (3D OSM, swap-ready for Google Photorealistic 3D Tiles).
-- **LLM routing:** OpenRouter, behind a two-tier router with circuit breakers; on-device endpoint is a v2 swap-in.
-- **Embeddings:** `BAAI/bge-small-en-v1.5` (CPU, 384-dim singleton on `app.state`).
-
-## Project layout
-
-Three apps under `apps/`, plus an OpenSpec workflow at the root. Each app has its own Dockerfile and runs independently in `docker-compose.yml`:
-
-- **`apps/api`**: FastAPI backend.
-
-  Hosts `/agent/ask` (SSE), `/llm/chat`, the agent loop, the citation verifier, the walk planner, and the `python -m app.ingest.cli` ingestion CLI.
-
-- **`apps/web`**: React + Vite + TypeScript SPA.
-
-  MapLibre GL is the default map engine; the `MapEngine` interface keeps Google Photorealistic 3D Tiles a swap-in away.
-
-- **`apps/worker`**: heartbeat-only in V1.
-
-  Same image as `apps/api`. The topology exists so v2 can drop in a scheduler without rebuilding.
-
-- **`openspec/`**: spec-driven change proposals.
-
-  Active change is `initial-palimpsest-scaffold`; locked V1 decisions live in `swap-llm-tiers-and-lock-mvp-decisions`.
-
-## Roadmap
-
-V1 ships the smallest end-to-end system that answers a citation-grounded walking-tour question. V2 widens the data sources and adds deployment surface:
-
-**V1, shipped:**
-
-- Monorepo + docker-compose
-- FastAPI skeleton + two-tier LLM router with circuit breakers
-- DB schema + embeddings (PostGIS + pgvector + pg_trgm; 384-dim)
-- Wikipedia + OSM ingestion (now 13,350 places, 456 wikipedia bodies, after Manhattan-wide widen on 2026-05-12)
-- Two-tool agent (`search_places`, `plan_walk`) + five-field citation verifier + OSRM-backed routing + walk-intent soft hint
-- SSE endpoint, frontend EventSource consumer, map markers + `flyTo`
-- Per-session telemetry harness for cost / cycle-time / failure-mode analysis
-- Docker images published to ghcr.io on every `main` push and on `v*` tags, pulled by `docker-compose.prod.yml`
-
-**V1.5, shipped on `worktree-eval-depth-and-corpus-expansion` (2026-05-12, tag `manhattan-100-eval-complete`):**
-
-- Manhattan-wide corpus expansion (SCOPE_BBOX widened, automatic re-ingest on `make nuke && make up`)
-- Selectable retrieval pipeline via `RETRIEVAL_MODE` env var (`dense` / `hybrid` / `hybrid_reranked`); BAAI/bge-reranker-base singleton loaded conditionally in the lifespan
-- Pre-registered 95-question Manhattan benchmark (tag `eval/manhattan-100-v1`); LLM-judge eval harness comparing palimpsest against vanilla-LLM and naive-RAG baselines. See `docs/eval/manhattan-100-results.md` for the ablation table and methodology caveats.
-
-**V2, planned:**
-
-- On-device LLM endpoint via the same env-driven router tier
-- Live data sources: Chronicling America, NYPL, NYC Open Data, MTA, NOAA
-- Hosted demo (VPS or PaaS) and a scheduler in `apps/worker`
-
-## Further reading
-
-The deep-dives below are dated snapshots; each describes the system as of the date in the filename.
-
-- [`docs/project-overview.md`](docs/project-overview.md): full project context, architecture, status snapshot, locked design decisions.
-- [`docs/agent-2026-04-28.md`](docs/agent-2026-04-28.md): agent loop, citation verifier, SSE endpoint.
-- [`docs/db-and-embeddings-2026-04-28.md`](docs/db-and-embeddings-2026-04-28.md): schema + ORM + embedder.
-- [`docs/ingestion-2026-04-28.md`](docs/ingestion-2026-04-28.md): Wikipedia + OSM ingestion.
-- [`docs/swap-llm-tiers-2026-04-28.md`](docs/swap-llm-tiers-2026-04-28.md): V1 MVP lock-down (LLM router rename, embedding model, citation contract, license).
-- [`docs/eval/manhattan-100-results.md`](docs/eval/manhattan-100-results.md): 2026-05-12 ablation across 5 systems on the 95-question Manhattan bank, with v2 CCR rubric and methodology caveats.
-- [`openspec/changes/`](openspec/changes/): OpenSpec changes — `initial-palimpsest-scaffold` (V1), `eval-depth-and-corpus-expansion` (V1.5, complete), and the `swap-llm-tiers-and-lock-mvp-decisions` lock note.
+- [OpenStreetMap](https://www.openstreetmap.org/) © contributors, [ODbL](https://opendatacommons.org/licenses/odbl/)
+- [Wikipedia](https://www.wikipedia.org/) and [Wikidata](https://www.wikidata.org/) under [CC BY-SA](https://creativecommons.org/licenses/by-sa/4.0/)
+- [OSRM](https://project-osrm.org/) for street-following walking routes
+- [BAAI BGE](https://huggingface.co/BAAI) embedding and reranker models
+- [OpenRouter](https://openrouter.ai/) for LLM inference
+- [MapLibre GL](https://maplibre.org/) for the in-browser map renderer
 
 ## License
 
-Code is MIT — see [`LICENSE`](LICENSE). Data sources are public-domain or open-licensed; the full table lives in [`docs/project-overview.md`](docs/project-overview.md).
+[MIT](LICENSE).
