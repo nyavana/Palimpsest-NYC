@@ -22,7 +22,7 @@ services:
       # order on first volume init. Schema changes require `make nuke && make up`.
       - ./apps/api/app/db/migrations:/docker-entrypoint-initdb.d:ro
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test:
         - CMD-SHELL
@@ -47,7 +47,7 @@ services:
     volumes:
       - redis-data:/data
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -118,7 +118,7 @@ services:
       - ./data:/app/data
       - hf-cache:/cache/huggingface
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     command:
       - /opt/venv/bin/uvicorn
       - app.main:app
@@ -163,7 +163,7 @@ services:
     image: palimpsest/web:dev
     container_name: palimpsest-web
     ports:
-      - "5173:80"
+      - "127.0.0.1:5173:80"
     depends_on:
       - api
     restart: unless-stopped
