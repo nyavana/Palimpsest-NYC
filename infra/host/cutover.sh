@@ -16,7 +16,9 @@
 #     same tags) — i.e. `make build-prod && make push-prod` was run
 #
 # Preserves the postgres data volume (`palimpsest-postgres-data`).
-# Drops the osrm data volume to force a re-extract under v5.27.1.
+# Preserves the osrm data volume too: dev and prod compose pin the same
+# osrm tag (v5.25.0; upstream Docker Hub has not published anything
+# newer), so the existing extract is binary-compatible.
 
 set -euo pipefail
 
@@ -52,17 +54,15 @@ run "chmod 600 $dump"
 echo "    backup at: $dump"
 
 echo
-echo "==> Step 2: pre-flight checks for prod images"
+echo "==> Step 2: pull prod images"
 tag=$(grep '^PALIMPSEST_TAG=' .env | cut -d= -f2 || echo 0.1.0)
-for img in ghcr.io/nyavana/palimpsest-api ghcr.io/nyavana/palimpsest-web ghcr.io/nyavana/palimpsest-postgres; do
-    if (( DRY )); then
-        echo "DRY: would check docker image inspect $img:$tag"
-    else
-        sudo docker image inspect "$img:$tag" >/dev/null 2>&1 \
-            || { echo "missing image: $img:$tag — run 'make build-prod && make push-prod' or 'docker pull'"; exit 1; }
-        echo "  ok: $img:$tag"
-    fi
-done
+if (( DRY )); then
+    echo "DRY: would docker compose pull (api/web/postgres at tag $tag, plus osrm and redis)"
+else
+    PALIMPSEST_TAG=$tag sudo --preserve-env=PALIMPSEST_TAG \
+        docker compose -f docker-compose.prod.yml pull \
+        || { echo "image pull failed — check 'docker login ghcr.io' and that the tag $tag is published"; exit 1; }
+fi
 
 echo
 echo "==> Step 3: generate + rotate postgres password"
@@ -87,15 +87,12 @@ prompt "About to 'docker compose down' the live dev stack. Continue?"
 run "sudo docker compose down"
 
 echo
-echo "==> Step 5: drop osrm-data volume (forces re-extract under v5.27.1)"
-run "sudo docker volume rm palimpsest-osrm-data || true"
-
-echo
-echo "==> Step 6: start prod stack"
+echo "==> Step 5: start prod stack"
+echo "    (osrm-data volume preserved; same v5.25.0 tag as the dev stack)"
 run "PALIMPSEST_TAG=$tag sudo --preserve-env=PALIMPSEST_TAG docker compose -f docker-compose.prod.yml up -d"
 
 echo
-echo "==> Step 7: wait for healthchecks (up to 5 minutes)"
+echo "==> Step 6: wait for healthchecks (up to 5 minutes)"
 if (( DRY == 0 )); then
     for i in $(seq 1 60); do
         unhealthy=$(sudo docker compose -f docker-compose.prod.yml ps --format '{{.Name}} {{.Health}}' | grep -E 'starting|unhealthy' || true)

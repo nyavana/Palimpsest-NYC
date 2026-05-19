@@ -52,7 +52,7 @@ docker compose -f docker-compose.prod.yml exec api python -m app.ingest.cli wiki
 
 Both ingestors are idempotent and short-circuit when their `places.source_type` partition is already populated.
 
-> **Routing note.** `docker-compose.prod.yml` now ships with `osrm-prepare` + `osrm` (pinned to `v5.27.1`). On first up, `osrm-prepare` builds the routing graph from `infra/osrm/extract.osm.pbf` (~15–30 min on a 2 vCPU box) and the runtime `osrm` service comes up after. The graph is gitignored — run `make extract` to fetch it, see [§6](#6-osrm-routing-graph).
+> **Routing note.** `docker-compose.prod.yml` now ships with `osrm-prepare` + `osrm` (pinned to `v5.25.0` — the upstream Docker Hub repo has not published a newer tag since 2021). On first up, `osrm-prepare` builds the routing graph from `infra/osrm/extract.osm.pbf` (~15–30 min on a 2 vCPU box) and the runtime `osrm` service comes up after. The graph is gitignored — run `make extract` to fetch it, see [§6](#6-osrm-routing-graph).
 
 ---
 
@@ -78,7 +78,7 @@ The host-side pieces installed by `infra/host/install.sh`:
 
 **APP_ENV gating.** When `APP_ENV=production` is set in `.env`, FastAPI suppresses `/docs`, `/redoc`, and `/openapi.json` so they're not reachable via the public `/api/*` proxy. Dev/staging/test keep Swagger.
 
-**Dev → prod cutover.** The first switch from the dev compose to this prod compose rotates the postgres password, drops the OSRM volume to re-extract under v5.27.1, and preserves the postgres data volume across the swap. Run it from the host repo root:
+**Dev → prod cutover.** The first switch from the dev compose to this prod compose rotates the postgres password and preserves both data volumes (`palimpsest-postgres-data` and `palimpsest-osrm-data` — both named identically in dev and prod compose) across the swap. Run it from the host repo root:
 
 ```bash
 bash infra/host/cutover.sh              # dry-run, prints the procedure

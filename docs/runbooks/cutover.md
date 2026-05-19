@@ -6,7 +6,7 @@ The first time the live stack on a host moves from `docker-compose.yml` (dev —
 
 You should be SSHed into the prod host, at the repo root (`/home/nyavana/git/Palimpsest-NYC` on `racknerd-2.5g`), with `docker compose ps` showing the dev stack healthy.
 
-The postgres data volume `palimpsest-postgres-data` has the **same name** in both compose files, so swapping compose files reuses the data on disk. The OSRM data volume is intentionally dropped (we're also bumping OSRM from v5.25.0 to v5.27.1; a re-extract is the safe play).
+Both data volumes (`palimpsest-postgres-data` and `palimpsest-osrm-data`) have the **same name** in dev and prod compose, and both pin OSRM to the same tag (`v5.25.0` — the upstream Docker Hub repo has not published anything newer since 2021), so swapping compose files reuses both volumes intact.
 
 Required:
 
@@ -26,12 +26,11 @@ bash infra/host/cutover.sh --execute    # do it
 What `--execute` runs, in order:
 
 1. **Pre-flight.** `chmod 600 .env`. Take a pre-cutover `pg_dumpall` dump to `/home/nyavana/palimpsest-pre-cutover-<UTC>.sql`, mode 600.
-2. **Image check.** Verifies `ghcr.io/nyavana/palimpsest-{api,web,postgres}:$PALIMPSEST_TAG` are pullable/present.
+2. **Pull prod images.** `docker compose -f docker-compose.prod.yml pull` for all services at `$PALIMPSEST_TAG`.
 3. **Postgres password rotation.** Generates a 40-char random password, runs `ALTER ROLE palimpsest WITH PASSWORD '...'` on the **live** db (so existing connections aren't disturbed), then rewrites `.env` with the new `POSTGRES_PASSWORD` and `APP_ENV=production`. Original `.env` is saved as `.env.before-cutover`.
-4. **Stop dev stack.** `docker compose down` — NOT `down -v`. The `palimpsest-postgres-data` volume persists.
-5. **Drop osrm volume.** `docker volume rm palimpsest-osrm-data` (forces re-extract under v5.27.1). The `extract.osm.pbf` source file at `infra/osrm/extract.osm.pbf` is untouched.
-6. **Start prod stack.** `docker compose -f docker-compose.prod.yml up -d`.
-7. **Wait for health.** Polls `docker compose ps` for up to 5 minutes until no services are `starting`/`unhealthy`.
+4. **Stop dev stack.** `docker compose down` — NOT `down -v`. Both data volumes persist (`palimpsest-postgres-data`, `palimpsest-osrm-data`).
+5. **Start prod stack.** `docker compose -f docker-compose.prod.yml up -d`.
+6. **Wait for health.** Polls `docker compose ps` for up to 5 minutes until no services are `starting`/`unhealthy`.
 
 ## Verification
 
@@ -54,7 +53,7 @@ Manual extras worth running once:
 # nginx really is non-root inside the web container
 sudo docker exec palimpsest-web id
 
-# osrm is on v5.27.1, not v5.25.0
+# osrm tag (pinned to v5.25.0; bumping this is tracked as a follow-up)
 sudo docker inspect palimpsest-osrm --format '{{.Config.Image}}'
 
 # api/worker can talk to postgres on the new password
