@@ -28,10 +28,20 @@ RUN npm run build
 
 FROM nginx:1.27-alpine AS runtime
 
+# Override main config (pid -> /tmp/nginx.pid) so the container can run
+# with a read-only rootfs. The vhost config goes into conf.d as usual.
+COPY nginx-main.conf /etc/nginx/nginx.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-EXPOSE 80
+# Listening on 8080 (unprivileged) lets us run as the non-root nginx
+# user without CAP_NET_BIND_SERVICE. The compose port mapping handles
+# the public-facing port translation.
+RUN chown -R nginx:nginx /var/cache/nginx /usr/share/nginx/html
+
+USER nginx
+
+EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD wget -qO- http://127.0.0.1/ || exit 1
+    CMD wget -qO- http://127.0.0.1:8080/ || exit 1

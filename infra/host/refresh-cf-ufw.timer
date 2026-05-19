@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly refresh of the Cloudflare UFW allowlist
+
+[Timer]
+OnCalendar=Sun *-*-* 03:17:00 UTC
+Persistent=true
+RandomizedDelaySec=30m
+Unit=refresh-cf-ufw.service
+
+[Install]
+WantedBy=timers.target

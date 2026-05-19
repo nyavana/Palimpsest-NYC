@@ -24,9 +24,12 @@ The `docker-compose.prod.yml` at the repo root pulls three images from GitHub Co
 git clone https://github.com/nyavana/Palimpsest-NYC.git
 cd Palimpsest-NYC
 
-cp .env.example .env
-# edit .env: set OPENROUTER_API_KEY=sk-or-v1-...  (or leave blank for BYOK)
+cp .env.prod.example .env       # or .env.example for a hands-off dev preview
+chmod 600 .env                  # holds the DB password and any OpenRouter key
+# edit .env: set OPENROUTER_API_KEY=sk-or-v1-... (or leave blank for BYOK),
+# generate POSTGRES_PASSWORD (≥32 random chars; see .env.prod.example header)
 
+docker login ghcr.io            # one-time, PAT with `read:packages`
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 ```
@@ -49,13 +52,53 @@ docker compose -f docker-compose.prod.yml exec api python -m app.ingest.cli wiki
 
 Both ingestors are idempotent and short-circuit when their `places.source_type` partition is already populated.
 
-> **Routing note.** `docker-compose.prod.yml` ships without the `osrm` / `osrm-prepare` services, so published-image deployments fall back to haversine straight-line walks (the `plan_walk` tool returns `routing_backend="haversine_fallback"`). For street-following routes in a deployed environment, add the OSRM services or build from source — see [§5](#5-build-from-source) and [§6](#6-osrm-routing-graph).
+> **Routing note.** `docker-compose.prod.yml` now ships with `osrm-prepare` + `osrm` (pinned to `v5.27.1`). On first up, `osrm-prepare` builds the routing graph from `infra/osrm/extract.osm.pbf` (~15–30 min on a 2 vCPU box) and the runtime `osrm` service comes up after. The graph is gitignored — run `make extract` to fetch it, see [§6](#6-osrm-routing-graph).
+
+---
+
+## 1.5 Hardening (production)
+
+`docker-compose.prod.yml` already bakes in: no `:latest` images, no host-published debug ports, `read_only` rootfs with explicit tmpfs, `cap_drop:[ALL]` with minimal `cap_add`, `no-new-privileges`, per-service mem/pids limits, log rotation, and nginx running non-root on 8080. The host-side pieces (`.env` perms, UFW Cloudflare-IP allowlist, prod env defaults) are installed via `make` and a one-time installer script.
+
+**Production checklist** (run on the host after the cutover):
+
+```bash
+chmod 600 .env                          # also done by `make harden-perms`
+make harden                             # perms + firewall, idempotent
+sudo bash infra/host/install.sh         # systemd timer for weekly CF refresh
+make verify-harden                      # read-only spot checks
+```
+
+The host-side pieces installed by `infra/host/install.sh`:
+
+| Path | Purpose |
+|---|---|
+| `/usr/local/sbin/refresh-cf-ufw` | Pulls `cloudflare.com/ips-v{4,6}`, rewrites the UFW allowlist for 80/443. Anti-lockout guard refuses to run if port 22 isn't ALLOW/LIMIT. |
+| `/etc/systemd/system/refresh-cf-ufw.{service,timer}` | Weekly refresh, `OnCalendar=Sun 03:17 UTC`, `Persistent=true`. |
+
+**APP_ENV gating.** When `APP_ENV=production` is set in `.env`, FastAPI suppresses `/docs`, `/redoc`, and `/openapi.json` so they're not reachable via the public `/api/*` proxy. Dev/staging/test keep Swagger.
+
+**Dev → prod cutover.** The first switch from the dev compose to this prod compose rotates the postgres password, drops the OSRM volume to re-extract under v5.27.1, and preserves the postgres data volume across the swap. Run it from the host repo root:
+
+```bash
+bash infra/host/cutover.sh              # dry-run, prints the procedure
+bash infra/host/cutover.sh --execute    # actually do it
+```
+
+The script prompts before each destructive step. See [docs/runbooks/cutover.md](runbooks/cutover.md) for the full procedure, verification, and rollback paths.
+
+**Backups.** Not configured in this PR. Postgres data is on the `palimpsest-postgres-data` named volume (~73 MB at time of writing); follow-up PR will add `restic` + a daily timer + an offsite repo. Until then, take a manual dump before any risky operation:
+
+```bash
+docker exec palimpsest-postgres pg_dumpall -U palimpsest > pre-change-$(date -u +%Y%m%dT%H%M%SZ).sql
+chmod 600 pre-change-*.sql
+```
 
 ---
 
 ## 2. Image pinning
 
-The default `${PALIMPSEST_TAG}` is `latest`, which tracks `main`. For reproducible deployments, pin to a semver tag:
+The default `${PALIMPSEST_TAG}` in `docker-compose.prod.yml` is `0.1.0` (no floating `latest` in prod). To deploy a different release, pin a semver tag:
 
 ```bash
 PALIMPSEST_TAG=v0.1.0 docker compose -f docker-compose.prod.yml pull
@@ -149,7 +192,7 @@ Copy `.env.example` to `.env` and adjust. The full reference:
 | Variable | Default |
 |---|---|
 | `POSTGRES_USER` | `palimpsest` |
-| `POSTGRES_PASSWORD` | `devpassword` (**change for production**) |
+| `POSTGRES_PASSWORD` | `devpassword` (**change for production** — use ≥32 random chars; `make harden-cutover` rotates it as part of the dev→prod migration) |
 | `POSTGRES_DB` | `palimpsest` |
 | `POSTGRES_HOST` | `postgres` |
 | `POSTGRES_PORT` | `5432` |

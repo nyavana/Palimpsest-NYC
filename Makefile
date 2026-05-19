@@ -176,3 +176,79 @@ eval-deps:
 
 eval-shell:
 	@echo "Run: source docs/eval/.venv/bin/activate"
+
+# ─────────────────────────────── prod ───────────────────────────────
+#
+# `up-prod` etc. wrap docker-compose.prod.yml. PALIMPSEST_TAG is the
+# image tag used across the three palimpsest images and is also read
+# from .env by docker compose. Override on the CLI:
+#   make build-prod PALIMPSEST_TAG=0.2.0
+
+PALIMPSEST_TAG ?= 0.1.0
+PROD_COMPOSE := $(COMPOSE) -f docker-compose.prod.yml
+PROD_IMAGES := ghcr.io/nyavana/palimpsest-api ghcr.io/nyavana/palimpsest-web ghcr.io/nyavana/palimpsest-postgres
+
+.PHONY: build-prod
+build-prod: ## Build prod images locally, tagged with PALIMPSEST_TAG
+	PALIMPSEST_TAG=$(PALIMPSEST_TAG) $(PROD_COMPOSE) build
+
+.PHONY: push-prod
+push-prod: ## Push prod images to ghcr.io (requires `docker login ghcr.io`)
+	@for img in $(PROD_IMAGES); do \
+		echo "→ pushing $$img:$(PALIMPSEST_TAG)"; \
+		docker push $$img:$(PALIMPSEST_TAG) || exit 1; \
+	done
+
+.PHONY: up-prod
+up-prod: ## Start the prod stack in the background
+	PALIMPSEST_TAG=$(PALIMPSEST_TAG) $(PROD_COMPOSE) up -d
+
+.PHONY: down-prod
+down-prod: ## Stop the prod stack (volumes preserved)
+	$(PROD_COMPOSE) down
+
+# ─────────────────────────────── harden ─────────────────────────────
+#
+# Host-side hardening. Run on the prod host after the cutover.
+# `harden` is idempotent and safe to re-run; `harden-cutover` is a
+# one-shot dev→prod migration and must not be re-run blindly.
+
+.PHONY: harden
+harden: harden-perms harden-firewall ## Run all idempotent hardening (perms + firewall)
+
+.PHONY: harden-perms
+harden-perms: ## chmod 600 .env; verify mode
+	@if [ ! -f .env ]; then echo "no .env present"; exit 1; fi
+	@chmod 600 .env
+	@echo ".env is now $$(stat -c '%a' .env)"
+
+.PHONY: harden-firewall
+harden-firewall: ## Refresh the Cloudflare-IP UFW allowlist
+	@if [ ! -x /usr/local/sbin/refresh-cf-ufw ]; then \
+		echo "refresh-cf-ufw not installed — run: sudo bash infra/host/install.sh"; \
+		exit 1; \
+	fi
+	sudo /usr/local/sbin/refresh-cf-ufw
+	@sudo ufw status numbered | grep -E 'cf-allowlist|22/tcp'
+
+.PHONY: harden-cutover
+harden-cutover: ## One-shot dev→prod cutover (DESTRUCTIVE — see infra/host/cutover.sh)
+	@if [ ! -f infra/host/cutover.sh ]; then echo "missing infra/host/cutover.sh"; exit 1; fi
+	bash infra/host/cutover.sh
+
+.PHONY: verify-harden
+verify-harden: ## Read-only checks that the hardening is in place
+	@echo "== .env perms (want 600) =="
+	@stat -c '%a' .env
+	@echo
+	@echo "== publicly-listening sockets (want only :22, :80, :443) =="
+	@sudo ss -tlnp | grep LISTEN || true
+	@echo
+	@echo "== api container caps + readonly rootfs =="
+	@sudo docker inspect palimpsest-api --format 'CapDrop={{.HostConfig.CapDrop}} ReadonlyRootfs={{.HostConfig.ReadonlyRootfs}} Memory={{.HostConfig.Memory}}' 2>&1 || true
+	@echo
+	@echo "== UFW cf-allowlist rule count (want >= 26: 16 v4 + 10 v6, both ports) =="
+	@sudo ufw status numbered | grep -c cf-allowlist || true
+	@echo
+	@echo "== /api/docs response (want 404 once APP_ENV=production) =="
+	@curl -sf -o /dev/null -w 'http_code=%{http_code}\n' https://palimpsest-demo.nyavana.io/api/docs || true

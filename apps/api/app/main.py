@@ -183,11 +183,19 @@ def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings)
 
+    # /docs, /redoc, /openapi.json are reachable via the /api proxy on a
+    # public deployment, so they're disabled outside dev.
+    docs_kwargs: dict = (
+        {"docs_url": None, "redoc_url": None, "openapi_url": None}
+        if settings.app_env == "production"
+        else {}
+    )
     app = FastAPI(
         title="Palimpsest NYC API",
         version=__version__,
         description="Agentic walking-tour backend for Palimpsest NYC",
         lifespan=lifespan,
+        **docs_kwargs,
     )
     app.state.settings = settings
 
