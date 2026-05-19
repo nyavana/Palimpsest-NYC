@@ -1,0 +1,23 @@
+[Unit]
+Description=Refresh UFW allowlist for Cloudflare IP ranges (ports 80/443)
+After=network-online.target ufw.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/refresh-cf-ufw
+
+# Tightening: the script needs root for ufw, but nothing else.
+ProtectSystem=strict
+ReadWritePaths=/var/log
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictRealtime=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target
