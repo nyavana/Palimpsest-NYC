@@ -58,7 +58,7 @@ Both ingestors are idempotent and short-circuit when their `places.source_type` 
 
 ## 1.5 Hardening (production)
 
-`docker-compose.prod.yml` already bakes in: no `:latest` images, no host-published debug ports, `read_only` rootfs with explicit tmpfs, `cap_drop:[ALL]` with minimal `cap_add`, `no-new-privileges`, per-service mem/pids limits, log rotation, and nginx running non-root on 8080. The host-side pieces (`.env` perms, UFW Cloudflare-IP allowlist, prod env defaults) are installed via `make` and a one-time installer script.
+`docker-compose.prod.yml` already bakes in: no `:latest` images, no host-published debug ports, `read_only` rootfs with explicit tmpfs, `cap_drop:[ALL]` with minimal `cap_add`, `no-new-privileges`, per-service mem/pids limits, log rotation, and a non-root web container built on the upstream-maintained `nginxinc/nginx-unprivileged:1.27-alpine` base (uid 101, port 8080, pid + temp paths under `/tmp`). The worker has `healthcheck: disable: true` (it shares the api image but doesn't bind `:8000`, so the image-level healthcheck would otherwise mark it unhealthy). The host-side pieces (`.env` perms, UFW Cloudflare-IP allowlist, prod env defaults) are installed via `make` and a one-time installer script.
 
 **Production checklist** (run on the host after the cutover):
 
