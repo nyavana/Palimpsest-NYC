@@ -86,7 +86,10 @@ added=0
 for port in "${PORTS[@]}"; do
     for cidr in "${v4[@]}" "${v6[@]}"; do
         ufw allow from "$cidr" to any port "$port" proto tcp comment "$RULE_COMMENT" >/dev/null
-        ((added++))
+        # NOT `((added++))`: post-increment returns the old value, which
+        # when 0 makes the arithmetic command exit with status 1, and
+        # `set -e` then kills the whole script on the first iteration.
+        added=$((added + 1))
     done
 done
 
