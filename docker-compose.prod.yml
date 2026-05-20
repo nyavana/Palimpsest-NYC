@@ -180,7 +180,6 @@ services:
     read_only: true
     tmpfs:
       - /tmp
-      - /var/cache/nginx
     logging:
       driver: json-file
       options:
@@ -251,8 +250,8 @@ services:
       osrm-prepare:
         condition: service_completed_successfully
     restart: unless-stopped
-    mem_limit: 200m
-    mem_reservation: 100m
+    mem_limit: 500m
+    mem_reservation: 250m
     pids_limit: 200
     cap_drop: [ALL]
     security_opt:

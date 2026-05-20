@@ -52,10 +52,10 @@ COPY apps/api/app /app/app
 RUN /opt/venv/bin/pip install -e '.'
 
 # Install worker deps on top (shares the same venv)
-COPY apps/worker/pyproject.toml /tmp/worker/pyproject.toml
-COPY apps/worker/README.md /tmp/worker/README.md
-COPY apps/worker/worker /tmp/worker/worker
-RUN /opt/venv/bin/pip install -e /tmp/worker
+COPY apps/worker/pyproject.toml /opt/worker/pyproject.toml
+COPY apps/worker/README.md /opt/worker/README.md
+COPY apps/worker/worker /opt/worker/worker
+RUN /opt/venv/bin/pip install -e /opt/worker
 
 # ── runtime stage ─────────────────────────────────────────────────────
 
@@ -69,13 +69,13 @@ WORKDIR /app
 
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /app /app
-COPY apps/worker /tmp/worker
+COPY apps/worker /opt/worker
 
 # Make sure logs/ and the HF cache mountpoint exist with app:app ownership.
 # Named volumes inherit the mountpoint's ownership at first attach, so this
 # avoids a chown-on-startup dance for the non-root container.
 RUN mkdir -p /app/logs/claude-sessions /cache/huggingface \
-    && chown -R app:app /app /opt/venv /tmp/worker /cache
+    && chown -R app:app /app /opt/venv /opt/worker /cache
 
 USER app
 
