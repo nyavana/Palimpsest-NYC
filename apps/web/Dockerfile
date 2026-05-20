@@ -26,20 +26,15 @@ RUN npm run build
 
 # ── runtime ──────────────────────────────────────────────────
 
-FROM nginx:1.27-alpine AS runtime
+# nginxinc/nginx-unprivileged is the upstream-maintained variant that
+# already runs as uid 101, listens on 8080, puts the pidfile in /tmp,
+# and routes every *_temp_path under /tmp. That makes the compose
+# `read_only: true` + `tmpfs:[/tmp]` combo work out of the box, so we
+# don't need a custom nginx-main.conf or a USER/chown dance here.
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
 
-# Override main config (pid -> /tmp/nginx.pid) so the container can run
-# with a read-only rootfs. The vhost config goes into conf.d as usual.
-COPY nginx-main.conf /etc/nginx/nginx.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Listening on 8080 (unprivileged) lets us run as the non-root nginx
-# user without CAP_NET_BIND_SERVICE. The compose port mapping handles
-# the public-facing port translation.
-RUN chown -R nginx:nginx /var/cache/nginx /usr/share/nginx/html
-
-USER nginx
 
 EXPOSE 8080
 
