@@ -8,8 +8,12 @@ Type=oneshot
 ExecStart=/usr/local/sbin/refresh-cf-ufw
 
 # Tightening: the script needs root for ufw, but nothing else.
-ProtectSystem=strict
-ReadWritePaths=/var/log
+# ufw writes to /etc/ufw/user{,6}.rules and locks under /run/ufw, so
+# we can't use ProtectSystem=strict. ProtectSystem=full keeps /usr and
+# /boot read-only while leaving /etc writable; we further pin the
+# allowed write paths explicitly.
+ProtectSystem=full
+ReadWritePaths=/etc/ufw /var/lib/ufw /var/log /run
 ProtectHome=yes
 PrivateTmp=yes
 NoNewPrivileges=yes
