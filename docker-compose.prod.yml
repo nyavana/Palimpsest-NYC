@@ -147,6 +147,12 @@ services:
       - /opt/venv/bin/python
       - -m
       - worker.main
+    # The worker shares the api image but does NOT bind :8000, so the
+    # image-level `curl localhost:8000/health` healthcheck would mark
+    # this container unhealthy a few seconds after start. Mirror the
+    # dev compose and explicitly disable it.
+    healthcheck:
+      disable: true
     restart: unless-stopped
     mem_limit: 350m
     mem_reservation: 200m

@@ -7,6 +7,11 @@ Wants=network-online.target
 Type=oneshot
 ExecStart=/usr/local/sbin/refresh-cf-ufw
 
+# Hung curl / DNS failure / wedged ufw would otherwise block systemd
+# forever on this oneshot. Each curl is already capped at 10 s by the
+# script and the rest is local UFW manipulation; 120 s is generous.
+TimeoutStartSec=120
+
 # Tightening: the script needs root for ufw, but nothing else.
 # ufw writes to /etc/ufw/user{,6}.rules and locks under /run/ufw, so
 # we can't use ProtectSystem=strict. ProtectSystem=full keeps /usr and

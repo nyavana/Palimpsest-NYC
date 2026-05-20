@@ -43,6 +43,8 @@ prompt() {
     fi
 }
 
+fail() { echo "ERROR: $*" >&2; exit 1; }
+
 [[ -f .env ]] || { echo "no .env in cwd — run from repo root"; exit 1; }
 
 echo "==> Step 1: pre-flight"
@@ -73,6 +75,13 @@ if (( DRY == 0 )); then
     old_db=$(grep '^POSTGRES_DB='   .env | cut -d= -f2)
     sudo docker exec palimpsest-postgres psql -U "$old_user" -d "$old_db" \
         -c "ALTER ROLE \"$old_user\" WITH PASSWORD '$new_pg';"
+    # Verify the new password authenticates BEFORE mutating .env.
+    # Without this, a failed sed leaves the live db with the new
+    # password and .env with the old, breaking the next compose up.
+    if ! sudo docker exec -e PGPASSWORD="$new_pg" palimpsest-postgres \
+           psql -U "$old_user" -d "$old_db" -c '\q' 2>/dev/null; then
+        fail "post-rotation auth check failed; .env left untouched"
+    fi
     # Update .env: POSTGRES_PASSWORD and APP_ENV
     sed -i.before-cutover -E \
         -e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$new_pg|" \
@@ -95,8 +104,18 @@ echo
 echo "==> Step 6: wait for healthchecks (up to 5 minutes)"
 if (( DRY == 0 )); then
     for i in $(seq 1 60); do
-        unhealthy=$(sudo docker compose -f docker-compose.prod.yml ps --format '{{.Name}} {{.Health}}' | grep -E 'starting|unhealthy' || true)
-        [[ -z $unhealthy ]] && break
+        status=$(sudo docker compose -f docker-compose.prod.yml ps \
+            --format '{{.Name}} {{.State}} {{.Health}}')
+        # Fail fast if anything has already died — otherwise the loop
+        # would spin out the full 5 minutes on an image-pull or env error.
+        if echo "$status" | grep -qE '\b(exited|dead|restarting)\b'; then
+            echo "$status"
+            fail "a container exited during startup"
+        fi
+        # Break when nothing is still starting/unhealthy.
+        if ! echo "$status" | grep -qE 'starting|unhealthy'; then
+            break
+        fi
         sleep 5
     done
     sudo docker compose -f docker-compose.prod.yml ps

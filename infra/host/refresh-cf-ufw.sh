@@ -67,6 +67,21 @@ if ! ufw status | grep -E '^22(/tcp)?[[:space:]]+(ALLOW|LIMIT)' >/dev/null; then
     fail "no ALLOW/LIMIT rule for port 22 detected; refusing to change UFW (would risk SSH lockout)"
 fi
 
+# Strip pre-existing global "ALLOW Anywhere" rules for 80/443 (left
+# over from UFW defaults or manual additions). Without this, the
+# cf-allowlist is purely additive and the lockdown is a no-op: traffic
+# can still reach the origin from any source. Loop by rule number,
+# highest first, so indices don't shift under us.
+mapfile -t legacy_nums < <(ufw status numbered \
+    | grep -E '\b(80|443)/tcp(\s\(v6\))?\s+ALLOW IN\s+Anywhere' \
+    | grep -v "$RULE_COMMENT" \
+    | sed -E 's/^\[ *([0-9]+)\].*/\1/' \
+    | sort -rn)
+for n in "${legacy_nums[@]}"; do
+    log "stripping legacy global rule [$n]"
+    echo y | ufw delete "$n" >/dev/null
+done
+
 # Delete prior cf-allowlist rules. UFW numbers shift as we delete, so
 # loop until none remain.
 while true; do
