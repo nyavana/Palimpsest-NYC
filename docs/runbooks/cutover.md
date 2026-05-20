@@ -27,10 +27,10 @@ What `--execute` runs, in order:
 
 1. **Pre-flight.** `chmod 600 .env`. Take a pre-cutover `pg_dumpall` dump to `/home/nyavana/palimpsest-pre-cutover-<UTC>.sql`, mode 600.
 2. **Pull prod images.** `docker compose -f docker-compose.prod.yml pull` for all services at `$PALIMPSEST_TAG`.
-3. **Postgres password rotation.** Generates a 40-char random password, runs `ALTER ROLE palimpsest WITH PASSWORD '...'` on the **live** db (so existing connections aren't disturbed), then rewrites `.env` with the new `POSTGRES_PASSWORD` and `APP_ENV=production`. Original `.env` is saved as `.env.before-cutover`.
+3. **Postgres password rotation.** Generates a 40-char random password, runs `ALTER ROLE palimpsest WITH PASSWORD '...'` on the **live** db (so existing connections aren't disturbed), then verifies the new password authenticates by opening a fresh `psql` connection with `PGPASSWORD=$new_pg`. **Only if that verification succeeds** does it rewrite `.env` with the new `POSTGRES_PASSWORD` and `APP_ENV=production`; original `.env` is saved as `.env.before-cutover`. If the verify fails, the script bails with `.env` left intact — operator can re-run `ALTER ROLE` with the old password by hand.
 4. **Stop dev stack.** `docker compose down` — NOT `down -v`. Both data volumes persist (`palimpsest-postgres-data`, `palimpsest-osrm-data`).
 5. **Start prod stack.** `docker compose -f docker-compose.prod.yml up -d`.
-6. **Wait for health.** Polls `docker compose ps` for up to 5 minutes until no services are `starting`/`unhealthy`.
+6. **Wait for health.** Polls `docker compose ps` for up to 5 minutes. Fails fast (does NOT spin out the timeout) if any container is `exited`, `dead`, or `restarting`. Returns once nothing is `starting`/`unhealthy`.
 
 ## Verification
 
@@ -62,7 +62,7 @@ sudo docker logs --tail 50 palimpsest-api  | grep -i 'error\|auth' || echo "no a
 
 ## Rollback
 
-If the prod stack is broken after step 7:
+If the prod stack is broken after step 6:
 
 ```bash
 # 1. Stop the prod stack, keep volumes.
@@ -101,7 +101,7 @@ cat /home/nyavana/palimpsest-pre-cutover-*.sql \
 sudo bash infra/host/install.sh         # CF allowlist + weekly timer
 ```
 
-Verify the CF allowlist with `sudo ufw status numbered | grep cf-allowlist` (expect 52 lines: 16 v4 + 10 v6 CIDRs × 2 ports). Then test that direct-origin requests are rejected:
+Verify the CF allowlist with `sudo ufw status numbered | grep -c cf-allowlist` — Cloudflare currently publishes 15 IPv4 + 7 IPv6 CIDRs, so the count is **(15 + 7) × 2 ports = 44**. The exact number will change as Cloudflare adds/removes ranges; the weekly timer keeps it fresh. Then test that direct-origin requests are rejected:
 
 ```bash
 curl --resolve palimpsest-demo.nyavana.io:443:198.46.175.245 \

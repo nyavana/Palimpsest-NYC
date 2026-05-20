@@ -6,8 +6,8 @@ The prod host restricts inbound 80/443 to Cloudflare's published IP ranges. Dire
 
 | Path | Role |
 |---|---|
-| `infra/host/refresh-cf-ufw.sh` | The script. Pulls `cloudflare.com/ips-v{4,6}`, validates each CIDR, deletes prior `cf-allowlist` rules, re-adds them. |
-| `infra/host/refresh-cf-ufw.service` | Oneshot systemd unit. |
+| `infra/host/refresh-cf-ufw.sh` | The script. Pulls `cloudflare.com/ips-v{4,6}`, validates each CIDR, **strips any pre-existing global `ALLOW IN Anywhere` rules on 80/443 that lack the `cf-allowlist` comment** (without this the allowlist would be purely additive and the lockdown a no-op), deletes prior `cf-allowlist` rules, re-adds the current set. Anti-lockout: refuses to run if `22/tcp` is not `ALLOW`/`LIMIT`. |
+| `infra/host/refresh-cf-ufw.service` | Oneshot systemd unit. `TimeoutStartSec=120` so a hung curl can't block systemd forever. Sandboxed with `ProtectSystem=full`, `PrivateTmp`, `NoNewPrivileges`, `ReadWritePaths=/etc/ufw …`. |
 | `infra/host/refresh-cf-ufw.timer` | Weekly schedule, `OnCalendar=Sun 03:17 UTC`, `Persistent=true`. |
 | `infra/host/install.sh` | Idempotent installer for all of the above. |
 
@@ -22,7 +22,7 @@ Copies the script to `/usr/local/sbin/refresh-cf-ufw`, the units to `/etc/system
 ## Verify
 
 ```bash
-sudo ufw status numbered | grep cf-allowlist | wc -l    # expect 52
+sudo ufw status numbered | grep cf-allowlist | wc -l    # currently 44 (15 v4 + 7 v6 × 2 ports); shifts with CF's published ranges
 systemctl status refresh-cf-ufw.timer
 systemctl list-timers refresh-cf-ufw.timer --no-pager
 journalctl -u refresh-cf-ufw -n 50 --no-pager
@@ -81,7 +81,7 @@ Status: active
 [ 2] 80/tcp                     ALLOW IN    173.245.48.0/20            # cf-allowlist
 [ 3] 80/tcp                     ALLOW IN    103.21.244.0/22            # cf-allowlist
 ...
-[28] 443/tcp                    ALLOW IN    173.245.48.0/20            # cf-allowlist
+[24] 443/tcp                    ALLOW IN    173.245.48.0/20            # cf-allowlist
 ...
 ```
 
