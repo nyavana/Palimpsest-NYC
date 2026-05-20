@@ -13,7 +13,12 @@ ExecStart=/usr/local/sbin/refresh-cf-ufw
 # /boot read-only while leaving /etc writable; we further pin the
 # allowed write paths explicitly.
 ProtectSystem=full
-ReadWritePaths=/etc/ufw /var/lib/ufw /var/log /run
+# Leading '-' makes the path optional: systemd silently skips entries
+# that don't exist instead of failing the mount-namespace setup. On
+# Ubuntu 24.04 /var/lib/ufw and /run/ufw are not created until ufw
+# runs, but they may exist on other distros — list both so the unit
+# is portable.
+ReadWritePaths=/etc/ufw /var/log -/var/lib/ufw -/run/ufw -/run
 ProtectHome=yes
 PrivateTmp=yes
 NoNewPrivileges=yes
