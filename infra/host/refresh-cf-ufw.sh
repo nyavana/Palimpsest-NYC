@@ -75,7 +75,10 @@ while true; do
     num=$(echo "$line" | sed -E 's/^\[ *([0-9]+)\].*/\1/')
     [[ $num =~ ^[0-9]+$ ]] || fail "could not parse rule number from: $line"
     log "deleting rule [$num]"
-    yes | ufw delete "$num" >/dev/null
+    # `echo y`, not `yes`: `yes` gets SIGPIPE'd when ufw exits, which
+    # under `set -euo pipefail` aborts the whole script after the first
+    # successful delete.
+    echo y | ufw delete "$num" >/dev/null
 done
 
 # Re-add allow rules.
